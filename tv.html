@@ -106,22 +106,6 @@ body{color:#fff;font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;curso
 /* 頒獎台 */
 .pod{background:#020205}
 .pod canvas{position:absolute;inset:0}
-.pod .ttl{position:absolute;top:60px;left:0;right:0;text-align:center;font-family:var(--orb);font-weight:900;font-style:italic;font-size:44px;letter-spacing:.5em;color:var(--yel);opacity:0;transition:opacity 1s}
-.pod .ttl.on{opacity:1}
-.pod .blk{position:absolute;bottom:0;width:440px;text-align:center}
-.pod .blk .base{position:relative;margin:0 auto;width:400px;height:0;border-radius:14px 14px 0 0;transition:height 1.1s cubic-bezier(.2,1.4,.4,1);overflow:hidden;
-  background:linear-gradient(180deg,#3b3b52,#15151f);box-shadow:inset 0 4px 0 rgba(255,255,255,.2)}
-.pod .blk .base b{display:block;font-family:var(--orb);font-weight:900;font-style:italic;font-size:150px;line-height:1.3;opacity:.9}
-.pod .blk .who{opacity:0;transform:translateY(40px);transition:all .8s .6s;margin-bottom:18px}
-.pod .blk .who .nm{font-size:70px;font-weight:900;text-shadow:0 0 30px rgba(0,0,0,.9)}
-.pod .blk .who .tm{display:inline-block;font-size:28px;font-weight:900;padding:4px 18px;border-radius:30px;border:3px solid var(--c);margin-top:6px;color:var(--c)}
-.pod .blk.on .who{opacity:1;transform:none}
-.pod .p1{left:740px}.pod .p2{left:260px}.pod .p3{left:1220px}
-.pod .p1 .base b{color:#ffd60a}.pod .p2 .base b{color:#d9e1ef}.pod .p3 .base b{color:#e8925a}
-.pod .p1.on .base{height:420px}.pod .p2.on .base{height:300px}.pod .p3.on .base{height:220px}
-.pod .p1 .who .nm{font-size:96px;color:#fff6c4}
-.pod .crown{font-size:90px;display:block;opacity:0;transform:translateY(-200px);transition:all 1s 1.2s cubic-bezier(.2,1.6,.4,1)}
-.pod .p1.on .crown{opacity:1;transform:none}
 
 /* 車隊排名 */
 .tv{background:radial-gradient(ellipse at 50% 20%,rgba(10,30,60,.95),rgba(3,3,8,.98) 70%)}
@@ -181,10 +165,6 @@ body{color:#fff;font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;curso
 
   <div class="layer pod" id="lPod">
     <canvas id="podCv" width="1920" height="1080"></canvas>
-    <div class="ttl" id="podTtl">CHAMPION</div>
-    <div class="blk p2" id="pb2"><div class="who"><div class="nm"></div><div class="tm"></div></div><div class="base"><b>2</b></div></div>
-    <div class="blk p1" id="pb1"><div class="who"><span class="crown">👑</span><div class="nm"></div><div class="tm"></div></div><div class="base"><b>1</b></div></div>
-    <div class="blk p3" id="pb3"><div class="who"><div class="nm"></div><div class="tm"></div></div><div class="base"><b>3</b></div></div>
   </div>
 
   <div class="layer tv" id="lTeams">
@@ -206,7 +186,26 @@ body{color:#fff;font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;curso
   const db = await GS.ready();
   const P = s => GS.ROOT + '/' + s;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const cv = $('cv'), ctx = cv.getContext('2d'), W = 1920, H = 1080;
+  const cv = $('cv'), ctx = cv.getContext('2d', { alpha: false }), W = 1920, H = 1080;
+  /* 畫質自動調整：投影電腦跑不動時，自動降低內部解析度（畫面一樣滿版，只是稍微柔一點）
+     網址加 ?q=0.67 可以固定畫質（1＝原生 1080p） */
+  const QLV = [1, 0.8, 0.67, 0.5];
+  const qForce = parseFloat(new URLSearchParams(location.search).get('q'));
+  let qi = 0, Q = 1, qAcc = 0, qN = 0, qWarm = 0;
+  function setQ(q) {
+    Q = q;
+    for (const c of [cv, $('podCv')]) { c.width = Math.round(W * q); c.height = Math.round(H * q); }
+  }
+  if (qForce > 0.2 && qForce <= 1) setQ(qForce);
+  function qMonitor(dtRaw) {
+    if (qForce > 0) return;
+    if (document.hidden) return;
+    if (++qWarm < 60) return;                  // 前 1 秒不算（載入中）
+    qAcc += dtRaw; qN++;
+    if (qN < 90) return;
+    const avg = qAcc / qN; qAcc = 0; qN = 0;
+    if (avg > 0.024 && qi < QLV.length - 1) { qi++; setQ(QLV[qi]); qWarm = 0; console.log('[全速衝刺] 自動降低畫質 →', QLV[qi]); }
+  }
 
   let game = {}, cfg = GS.cfgOf(null), tr = GS.track(cfg), round = 0, fin = null, tcount = {}, total = 0, tstat = {}, top = [], results = null;
   const subs = {};
@@ -323,41 +322,366 @@ body{color:#fff;font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;curso
     podList = list.slice(0, 3);
     if (view === 'lPod') { stopPodium(); startPodium(); }
   }
-  let podList = [], podTimers = [], confetti = [], podOn = false;
-  function startPodium() {
-    stopPodium(); podOn = true;
-    [1, 2, 3].forEach(k => { const p = podList[k - 1], b = $('pb' + k); b.classList.remove('on'); const t = p ? GS.team(cfg, p.tm) : { n: '', c: '#888' };
-      b.querySelector('.nm').textContent = p ? p.n : '—'; const tm = b.querySelector('.tm'); tm.textContent = t.n; tm.style.setProperty('--c', t.c); });
-    $('podTtl').classList.remove('on');
-    podTimers.push(setTimeout(() => $('pb3').classList.add('on'), 900));
-    podTimers.push(setTimeout(() => $('pb2').classList.add('on'), 3200));
-    podTimers.push(setTimeout(() => { $('pb1').classList.add('on'); $('podTtl').classList.add('on'); burst(); }, 5800));
-    podTimers.push(setTimeout(burst, 7600));
-  }
-  function stopPodium() { podTimers.forEach(clearTimeout); podTimers = []; podOn = false; confetti = []; }
-  function burst() {
-    const cols = ['#ffd60a', '#ff2d55', '#19e3ff', '#2dff8a', '#ffffff', '#b44dff'];
-    for (let i = 0; i < 260; i++) confetti.push({ x: 960 + (Math.random() - 0.5) * 300, y: 520, vx: (Math.random() - 0.5) * 1500, vy: -600 - Math.random() * 900, r: Math.random() * 6.3, vr: (Math.random() - 0.5) * 12, c: cols[i % cols.length], s: 8 + Math.random() * 10, life: 0 });
-  }
-  function drawPodium(dt, t) {
-    const c = $('podCv'), x = c.getContext('2d');
-    x.clearRect(0, 0, W, H);
-    const lit = [3, 2, 1].map(k => $('pb' + k).classList.contains('on'));
-    [[1430, 3], [500, 2], [960, 1]].forEach(([px, k], j) => {
-      if (!$('pb' + k).classList.contains('on')) return;
-      const sw = Math.sin(t * 0.8 + j) * 60;
-      const g = x.createLinearGradient(px, 0, px, H);
-      g.addColorStop(0, k === 1 ? 'rgba(255,230,140,.45)' : 'rgba(200,220,255,.3)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-      x.fillStyle = g; x.beginPath(); x.moveTo(px - 40 + sw * 0.2, 0); x.lineTo(px + 40 + sw * 0.2, 0); x.lineTo(px + 300 + sw, H); x.lineTo(px - 300 + sw, H); x.closePath(); x.fill();
-    });
-    // 方格旗地板
-    const fy = 980;
-    for (let i = 0; i < 40; i++) for (let j = 0; j < 3; j++) { if ((i + j) % 2) continue; x.fillStyle = 'rgba(255,255,255,.08)'; x.fillRect(i * 48, fy + j * 34, 48, 34); }
-    for (const p of confetti) {
-      p.life += dt; p.vy += 900 * dt; p.vx *= 0.99; p.x += p.vx * dt; p.y += p.vy * dt; p.r += p.vr * dt;
-      x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.fillStyle = p.c; x.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); x.restore();
+  /* ═════════════ 頒獎台（F1 式，全部程式繪製，約 15 秒後進入循環） ═════════════ */
+  let podList = [], podT0 = 0, podOn = false, parts = [], fworks = [], flashes = [], podLast = 0;
+  const POD = {               // 三個台：x 中心、台面高度、寬度
+    1: { x: 960, top: 600, w: 400, rev: 8 },
+    2: { x: 555, top: 680, w: 380, rev: 5 },
+    3: { x: 1365, top: 720, w: 380, rev: 2 }
+  };
+  const FLOOR = 930;
+  const METAL = {             // 金、銀、銅
+    1: { a: '#fff3b0', b: '#e2b33a', c: '#8a6414', glow: '255,214,90', bg: ['#3a2c0a', '#120d02'], lab: 'WINNER' },
+    2: { a: '#ffffff', b: '#c3cad8', c: '#5d6578', glow: '210,225,255', bg: ['#262a36', '#0c0e14'], lab: '2ND' },
+    3: { a: '#ffd9bc', b: '#d4874f', c: '#6e3a18', glow: '255,170,110', bg: ['#33200f', '#110904'], lab: '3RD' }
+  };
+  function startPodium() { podOn = true; podT0 = performance.now(); parts = []; fworks = []; flashes = []; podLast = 0; }
+  function stopPodium() { podOn = false; parts = []; fworks = []; }
+  const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : 1 - Math.pow(1 - x, 3);
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  /* 背板：重複排列的贊助牆 */
+  function podWall(x, lit) {
+    const lk = logoImg && logoImg.complete && logoImg.naturalWidth ? 'L' + logoSrc.length + logoSrc.slice(-24) : 'N';
+    const wall = GS.sprite('podwall|' + (cfg.brand || '') + '|' + lk + '|' + (document.fonts && document.fonts.status), W, FLOOR, (c) => {
+      const x = c;
+    const g = x.createLinearGradient(0, 0, 0, FLOOR);
+    g.addColorStop(0, '#0b0c18'); g.addColorStop(1, '#141629');
+    x.fillStyle = g; x.fillRect(0, 0, W, FLOOR);
+    const tw = 260, th = 104;
+    x.save(); x.textAlign = 'center'; x.textBaseline = 'middle';
+    for (let r = 0; r * th < FLOOR - 120; r++) for (let c = -1; c * tw < W + tw; c++) {
+      const tx = c * tw + (r % 2) * tw / 2, ty = 40 + r * th, k = (r + c) % 3;
+      x.fillStyle = k === 0 ? '#2a0812' : k === 1 ? '#0e1019' : '#141729';
+      x.fillRect(tx + 4, ty + 4, tw - 8, th - 8);
+      x.globalAlpha = 0.42;
+      if (k === 1 && logoImg && logoImg.complete && logoImg.naturalWidth) {
+        const s = Math.min((tw - 50) / logoImg.naturalWidth, (th - 34) / logoImg.naturalHeight);
+        x.drawImage(logoImg, tx + tw / 2 - logoImg.naturalWidth * s / 2, ty + th / 2 - logoImg.naturalHeight * s / 2, logoImg.naturalWidth * s, logoImg.naturalHeight * s);
+      } else {
+        x.fillStyle = k === 0 ? '#ff5a7a' : k === 1 ? '#8fdcff' : '#e2c46a';
+        x.font = `italic 900 ${k === 2 ? 30 : 26}px Orbitron, "Noto Sans TC", sans-serif`;
+        x.fillText(k === 2 ? '全速衝刺' : (cfg.brand || 'FULL SPRINT'), tx + tw / 2, ty + th / 2, tw - 30);
+      }
+      x.globalAlpha = 1;
     }
-    confetti = confetti.filter(p => p.y < H + 40);
+    x.restore();
+    });
+    x.drawImage(wall, 0, 0);
+    // 牆面打光
+    const l = x.createRadialGradient(960, 420, 50, 960, 420, 1000);
+    l.addColorStop(0, `rgba(255,230,190,${0.14 * lit})`); l.addColorStop(1, 'rgba(0,0,0,.7)');
+    x.fillStyle = l; x.fillRect(0, 0, W, FLOOR);
+    // 頂部燈架
+    x.fillStyle = '#05060a'; x.fillRect(0, 0, W, 34);
+    for (let i = 0; i < 16; i++) { const lx = 60 + i * 120; x.fillStyle = '#20232f'; x.fillRect(lx - 16, 26, 32, 22); x.fillStyle = `rgba(255,240,200,${0.3 + 0.7 * lit})`; x.beginPath(); x.arc(lx, 50, 8, 0, Math.PI * 2); x.fill(); }
+  }
+  function podFloor(x) {
+    x.drawImage(GS.sprite('podfloor', W, H - FLOOR + 30, (c) => { c.translate(0, -(FLOOR - 30)); podFloorRaw(c); }), 0, FLOOR - 30);
+  }
+  function podFloorRaw(x) {
+    const g = x.createLinearGradient(0, FLOOR, 0, H);
+    g.addColorStop(0, '#20222e'); g.addColorStop(1, '#07080c');
+    x.fillStyle = g; x.fillRect(0, FLOOR, W, H - FLOOR);
+    x.save(); x.shadowColor = '#19e3ff'; x.shadowBlur = 18; x.fillStyle = '#19e3ff'; x.fillRect(0, FLOOR, W, 4); x.restore();
+    x.fillStyle = 'rgba(255,255,255,.05)';
+    for (let i = 0; i < 48; i++) for (let j = 0; j < 2; j++) if ((i + j) % 2 === 0) x.fillRect(i * 40, FLOOR + j * 26, 40, 26);
+  }
+  /* 頒獎台 */
+  function podBlock(x, k, p, lit) {
+    const b = POD[k], L = b.x - b.w / 2, h = FLOOR - b.top;
+    const M = METAL[k], col = [M.a, M.b, M.c];
+    // 台面
+    x.fillStyle = '#2a2d3c'; x.beginPath(); x.moveTo(L - 10, b.top); x.lineTo(L + b.w + 10, b.top); x.lineTo(L + b.w - 6, b.top - 22); x.lineTo(L + 6, b.top - 22); x.closePath(); x.fill();
+    // 正面
+    const g = x.createLinearGradient(0, b.top, 0, FLOOR);
+    g.addColorStop(0, M.bg[0]); g.addColorStop(1, M.bg[1]);
+    x.fillStyle = g; x.fillRect(L, b.top, b.w, h);
+    const tg = x.createLinearGradient(L, 0, L + b.w, 0); tg.addColorStop(0, M.c); tg.addColorStop(0.5, M.a); tg.addColorStop(1, M.c);
+    x.save();
+    x.fillStyle = tg; x.fillRect(L, b.top, b.w, k === 1 ? 14 : 10); x.fillRect(L, b.top, 8, h); x.fillRect(L + b.w - 8, b.top, 8, h); x.restore();
+    // 名次標籤（台面上的金屬牌）
+    x.save(); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = M.c; x.font = 'italic 900 22px Orbitron, sans-serif';
+    x.fillText(M.lab, b.x, b.top - 11); x.restore();
+    // 名次數字
+    x.save(); x.textAlign = 'center'; x.textBaseline = 'top';
+    const ng = x.createLinearGradient(0, b.top + 20, 0, b.top + 150);
+    col.forEach((c, i) => ng.addColorStop(i / 2, c));
+    const ns = k === 1 ? 140 : k === 2 ? 100 : 84;
+    x.fillStyle = ng; x.font = `italic 900 ${ns}px Orbitron, sans-serif`;
+    if (lit > 0) {                               // 數字光暈（快取貼圖，不用即時模糊）
+      const gs = GS.sprite('numglow' + k, 256, 256, (c) => { const gg = c.createRadialGradient(128, 128, 0, 128, 128, 128); gg.addColorStop(0, `rgba(${M.glow},.55)`); gg.addColorStop(1, `rgba(${M.glow},0)`); c.fillStyle = gg; c.fillRect(0, 0, 256, 256); });
+      x.save(); x.globalAlpha = lit; x.globalCompositeOperation = 'lighter'; x.drawImage(gs, b.x - 120, b.top - 30, 240, 240); x.restore();
+    }
+    x.fillText(k, b.x, b.top + 16);
+    x.restore();
+    // 名牌
+    if (p && p.show > 0) {
+      const ns = k === 1 ? 140 : k === 2 ? 100 : 84, py = b.top + ns + 22, ph = Math.min(170, FLOOR - py - 12);
+      const a = ease(p.show), tm = GS.team(cfg, p.tm);
+      x.save(); x.globalAlpha = a; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillStyle = 'rgba(0,0,0,.6)'; GS.rr(x, L + 16, py, b.w - 32, ph, 14); x.fill();
+      x.strokeStyle = METAL[k].b; x.lineWidth = k === 1 ? 4 : 3; x.stroke();
+      x.fillStyle = tm.c; x.fillRect(L + 16, py + ph - 6, b.w - 32, 6);
+      x.fillStyle = '#fff'; x.font = `900 ${Math.min(66, ph * 0.42)}px "Noto Sans TC", sans-serif`;
+      x.fillText(p.n, b.x, py + ph * 0.38, b.w - 60);
+      x.fillStyle = tm.c; x.font = `900 ${Math.min(30, ph * 0.22)}px "Noto Sans TC", sans-serif`;
+      x.fillText(tm.n, b.x, py + ph * 0.76, b.w - 60);
+      x.restore();
+    }
+  }
+  /* 車手：腳底 (cx, fy)，h＝身高 px；arm：右手舉獎盃 0~1；bottle：左手香檳 0~1 */
+  function podDriver(x, cx, fy, h, col, arm, bottle, t, seed, rk) {
+    const k = h / 300;
+    x.save(); x.translate(cx, fy); x.scale(k, k);
+    const dark = GS.shade(col, -0.45), light = GS.shade(col, 0.35);
+    // 影子
+    x.fillStyle = 'rgba(0,0,0,.4)'; x.beginPath(); x.ellipse(0, 2, 70, 10, 0, 0, Math.PI * 2); x.fill();
+    // 腿
+    x.fillStyle = dark;
+    GS.rr(x, -42, -135, 36, 130, 14); x.fill(); GS.rr(x, 6, -135, 36, 130, 14); x.fill();
+    x.fillStyle = 'rgba(255,255,255,.85)'; x.fillRect(-42, -130, 6, 110); x.fillRect(36, -130, 6, 110);
+    x.fillStyle = '#0b0b10'; GS.rr(x, -46, -20, 44, 22, 8); x.fill(); GS.rr(x, 2, -20, 44, 22, 8); x.fill();
+    // 手臂（先畫在身體後面的左手）
+    const arm1 = (ang, len, hold) => {
+      const sx = hold === 'L' ? -58 : 58, sy = -222;
+      const ex = sx + Math.sin(ang) * len, ey = sy - Math.cos(ang) * len;
+      x.strokeStyle = col; x.lineWidth = 28; x.lineCap = 'round';
+      x.beginPath(); x.moveTo(sx, sy); x.lineTo(ex, ey); x.stroke();
+      x.strokeStyle = light; x.lineWidth = 6; x.beginPath(); x.moveTo(sx, sy); x.lineTo(ex, ey); x.stroke();
+      x.fillStyle = '#111'; x.beginPath(); x.arc(ex, ey, 16, 0, Math.PI * 2); x.fill();
+      return [ex, ey];
+    };
+    // 左手：放下 → 舉香檳（往外上方，會搖晃）
+    const shake = bottle > 0.9 ? Math.sin(t * 22 + seed) * 0.08 : 0;
+    const angL = Math.PI * (1 - 0.08) + (-(Math.PI * 0.62)) * ease(bottle) + shake;
+    // 身體
+    const bg = x.createLinearGradient(-60, 0, 60, 0);
+    bg.addColorStop(0, dark); bg.addColorStop(0.5, col); bg.addColorStop(1, dark);
+    x.fillStyle = bg; x.beginPath();
+    x.moveTo(-62, -232); x.lineTo(62, -232); x.lineTo(50, -128); x.lineTo(-50, -128); x.closePath(); x.fill();
+    x.fillStyle = '#fff'; x.fillRect(-62, -200, 10, 70); x.fillRect(52, -200, 10, 70);
+    x.fillStyle = '#0b0b10'; x.fillRect(-52, -138, 104, 14);
+    x.fillStyle = 'rgba(255,255,255,.85)'; GS.rr(x, -34, -205, 30, 16, 4); x.fill(); GS.rr(x, 8, -205, 26, 16, 4); x.fill();
+    x.fillStyle = 'rgba(0,0,0,.35)'; GS.rr(x, -20, -176, 40, 22, 4); x.fill();
+    x.fillStyle = light; x.beginPath(); x.ellipse(-50, -224, 20, 12, 0, 0, Math.PI * 2); x.fill(); x.beginPath(); x.ellipse(50, -224, 20, 12, 0, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#0b0b10'; GS.rr(x, -24, -240, 48, 14, 6); x.fill();
+    // 2、3 名：獎牌掛在胸前（舉手時改拿在手上）
+    if (rk !== 1 && arm < 0.05) {
+      x.strokeStyle = '#1e4bd6'; x.lineWidth = 12;
+      x.beginPath(); x.moveTo(-22, -236); x.lineTo(0, -176); x.lineTo(22, -236); x.stroke();
+      podMedalDisc(x, 0, -158, 30, rk, t);
+    }
+    const [lx, ly] = arm1(angL, 98, 'L');
+    // 香檳瓶
+    if (bottle > 0) {
+      const ba = angL + 0.1;
+      x.save(); x.translate(lx, ly); x.rotate(ba);
+      x.fillStyle = '#0f4d2a'; GS.rr(x, -12, -70, 24, 70, 8); x.fill();
+      x.fillStyle = '#0f4d2a'; x.fillRect(-6, -96, 12, 30);
+      x.fillStyle = '#e8c35a'; x.fillRect(-7, -100, 14, 14); x.fillStyle = '#f7f2e0'; x.fillRect(-12, -46, 24, 20);
+      x.restore();
+      podDriver.tip = [lx + Math.sin(ba) * 100, ly - Math.cos(ba) * 100, ba];
+    } else podDriver.tip = null;
+    // 頭盔
+    x.fillStyle = '#1a1a22'; x.fillRect(-16, -252, 32, 22);
+    const hg = x.createRadialGradient(-14, -300, 6, 0, -282, 48);
+    hg.addColorStop(0, light); hg.addColorStop(0.6, col); hg.addColorStop(1, dark);
+    x.fillStyle = hg; x.beginPath(); x.ellipse(0, -282, 44, 46, 0, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#fff'; x.fillRect(-44, -300, 88, 8);
+    const vg = x.createLinearGradient(0, -292, 0, -262);
+    vg.addColorStop(0, '#1c2a4a'); vg.addColorStop(0.5, '#5b7cc4'); vg.addColorStop(1, '#0b1020');
+    x.fillStyle = vg; GS.rr(x, -36, -292, 72, 28, 12); x.fill();
+    x.fillStyle = 'rgba(255,255,255,.5)'; x.fillRect(-26, -288, 30, 4);
+    // 右手：放下 → 舉獎盃
+    const angR = Math.PI * 0.92 - Math.PI * (rk === 1 ? 0.86 : 0.74) * ease(arm);
+    const [rx, ry] = arm1(angR, 98, 'R');
+    if (rk === 1) podTrophy(x, rx, ry - 6, 1.15, t, 1, arm);        // 冠軍：獎盃
+    else if (arm >= 0.05) {                                            // 2、3 名：把獎牌舉起來，緞帶從手上垂下
+      const sw = Math.sin(t * 2.4 + seed) * 0.18;
+      const mx = rx + Math.sin(sw) * 52, my = ry + Math.cos(sw) * 52;
+      x.strokeStyle = '#1e4bd6'; x.lineWidth = 12; x.lineCap = 'round';
+      x.beginPath(); x.moveTo(rx - 8, ry); x.lineTo(mx, my - 30); x.lineTo(rx + 8, ry); x.stroke();
+      podMedalDisc(x, mx, my, 42, rk, t);
+    }
+    x.restore();
+    // 噴灑出口（換回畫面座標）
+    if (podDriver.tip) podDriver.tip = [cx + podDriver.tip[0] * k, fy + podDriver.tip[1] * k, podDriver.tip[2]];
+  }
+  function podMedalDisc(x, cx, cy, r, rk, t) {
+    const M = METAL[rk];
+    x.save();
+    x.globalCompositeOperation = 'lighter';
+    const gl = x.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 2.2); gl.addColorStop(0, `rgba(${M.glow},.35)`); gl.addColorStop(1, `rgba(${M.glow},0)`);
+    x.fillStyle = gl; x.fillRect(cx - r * 2.2, cy - r * 2.2, r * 4.4, r * 4.4);
+    x.restore(); x.save();
+    const mg = x.createRadialGradient(cx - r * 0.35, cy - r * 0.35, 2, cx, cy, r); mg.addColorStop(0, M.a); mg.addColorStop(0.55, M.b); mg.addColorStop(1, M.c);
+    x.fillStyle = mg; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
+    x.strokeStyle = M.c; x.lineWidth = r * 0.12; x.beginPath(); x.arc(cx, cy, r * 0.78, 0, Math.PI * 2); x.stroke();
+    x.fillStyle = M.c; x.font = `italic 900 ${r * 0.95}px Orbitron, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(rk, cx, cy + r * 0.05);
+    x.fillStyle = `rgba(255,255,255,${0.35 + 0.3 * Math.sin(t * 4 + rk)})`; x.beginPath(); x.ellipse(cx - r * 0.35, cy - r * 0.4, r * 0.28, r * 0.12, -0.6, 0, Math.PI * 2); x.fill();
+    x.restore();
+  }
+  function podTrophy(x, hx, hy, s, t, rk, arm) {
+    if (arm !== undefined && arm < 0.05) return;
+    const M = METAL[rk || 1];
+    x.save(); x.translate(hx, hy); x.scale(s, s);
+    if (rk === 1) { x.save(); x.globalCompositeOperation = 'lighter'; const gg = x.createRadialGradient(0, -80, 5, 0, -80, 110); gg.addColorStop(0, 'rgba(255,220,120,.55)'); gg.addColorStop(1, 'rgba(255,220,120,0)'); x.fillStyle = gg; x.fillRect(-110, -190, 220, 220); x.restore(); }
+    const g = x.createLinearGradient(-40, 0, 40, 0);
+    g.addColorStop(0, M.c); g.addColorStop(0.35, M.a); g.addColorStop(0.6, M.b); g.addColorStop(1, M.c);
+    x.fillStyle = g;
+    x.fillRect(-26, -14, 52, 12); x.fillRect(-8, -50, 16, 40);
+    x.beginPath(); x.moveTo(-44, -120); x.quadraticCurveTo(-42, -52, 0, -48); x.quadraticCurveTo(42, -52, 44, -120); x.closePath(); x.fill();
+    x.strokeStyle = M.b; x.lineWidth = 7;
+    x.beginPath(); x.arc(-46, -96, 16, Math.PI * 0.5, Math.PI * 1.5); x.stroke();
+    x.beginPath(); x.arc(46, -96, 16, -Math.PI * 0.5, Math.PI * 0.5); x.stroke();
+    x.fillStyle = `rgba(255,255,255,${0.5 + 0.4 * Math.sin(t * 5)})`; x.fillRect(-30, -116, 6, 40);
+    x.restore();
+  }
+  /* 方格旗 */
+  function podFlag(x, px, t, dir) {
+    x.fillStyle = '#2a2d3c'; x.fillRect(px - 5, 300, 10, FLOOR - 300); x.fillStyle = '#e2b33a'; x.beginPath(); x.arc(px, 296, 9, 0, Math.PI * 2); x.fill();
+    const fw = 200, fh = 130, cells = 8, rows = 5;
+    for (let i = 0; i < cells; i++) for (let j = 0; j < rows; j++) {
+      const u0 = i / cells, u1 = (i + 1) / cells;
+      const wv = u => Math.sin(t * 5 - u * 6) * 18 * u;
+      const xa = px + dir * u0 * fw, xb = px + dir * u1 * fw;
+      const ya = 300 + j * fh / rows, yb = ya + fh / rows;
+      x.fillStyle = (i + j) % 2 ? '#111' : '#f2f2f2';
+      x.beginPath(); x.moveTo(xa, ya + wv(u0)); x.lineTo(xb, ya + wv(u1)); x.lineTo(xb, yb + wv(u1)); x.lineTo(xa, yb + wv(u0)); x.closePath(); x.fill();
+    }
+  }
+  /* 觀眾剪影＋手機閃光 */
+  function podCrowd(x, t) {
+    x.fillStyle = '#030306';
+    for (let i = 0; i < 46; i++) {
+      const cx = i * 43 + (i % 3) * 7, cy = 1010 + (i % 4) * 12, bob = Math.sin(t * 4 + i) * 4;
+      x.beginPath(); x.arc(cx, cy - 34 + bob, 22, 0, Math.PI * 2); x.fill();
+      GS.rr(x, cx - 36, cy - 12 + bob, 72, 120, 26); x.fill();
+    }
+  }
+  function podFirework(x0, y0) {
+    const cols = ['#ffd60a', '#ff2d55', '#19e3ff', '#ffffff', '#2dff8a', '#ff9f0a'], c = cols[Math.floor(Math.random() * cols.length)], n = 70;
+    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, sp = rnd(180, 420); fworks.push({ x: x0, y: y0, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0, max: rnd(1.1, 1.6), c }); }
+  }
+  function podConfetti(x0, y0, dir, n) {
+    const cols = ['#ffd60a', '#ffffff', '#ff2d55', '#19e3ff', '#e2b33a'];
+    for (let i = 0; i < n; i++) parts.push({ k: 'c', x: x0, y: y0, vx: dir * rnd(200, 900), vy: -rnd(700, 1400), r: Math.random() * 6, vr: rnd(-12, 12), c: cols[i % cols.length], s: rnd(10, 18), life: 0 });
+  }
+
+  function drawPodium(dt, tn) {
+    const c = $('podCv'), x = c.getContext('2d');
+    x.setTransform(Q, 0, 0, Q, 0, 0);
+    const T = (performance.now() - podT0) / 1000, t = tn;
+    const lit = ease((T - 7.6) / 1.2);         // 第 1 名出場後全場燈亮
+    x.clearRect(0, 0, W, H);
+    podWall(x, lit);
+    podFloor(x);
+    podFlag(x, 110, t, 1); podFlag(x, W - 110, t, -1);
+    // 車手（畫在台子後面，從台後升起）
+    const drv = {};
+    [2, 3, 1].forEach(k => {
+      const p = podList[k - 1], b = POD[k];
+      const e = ease((T - b.rev) / 1.1);
+      if (!p || e <= 0) return;
+      const h = k === 1 ? 300 : 280, rise = (1 - e) * (h + 30);
+      const arm = ease((T - 11) / 0.8), bot = ease((T - 12.6) / 0.6);
+      if (k === 1 && lit > 0) {            // 冠軍背後金色光暈
+        x.save(); x.globalCompositeOperation = 'lighter';
+        const gg = x.createRadialGradient(b.x, b.top - 170, 20, b.x, b.top - 170, 300);
+        gg.addColorStop(0, `rgba(255,210,90,${0.38 * lit * (0.85 + 0.15 * Math.sin(t * 3))})`); gg.addColorStop(1, 'rgba(255,210,90,0)');
+        x.fillStyle = gg; x.fillRect(b.x - 300, b.top - 470, 600, 600);
+        for (let i = 0; i < 14; i++) {      // 放射光芒
+          const an = t * 0.25 + i / 14 * Math.PI * 2;
+          x.fillStyle = `rgba(255,220,120,${0.07 * lit})`; x.beginPath(); x.moveTo(b.x, b.top - 170);
+          x.lineTo(b.x + Math.cos(an - 0.06) * 420, b.top - 170 + Math.sin(an - 0.06) * 420); x.lineTo(b.x + Math.cos(an + 0.06) * 420, b.top - 170 + Math.sin(an + 0.06) * 420); x.closePath(); x.fill();
+        }
+        x.restore();
+      }
+      podDriver(x, b.x, b.top - 22 + rise, h, GS.team(cfg, p.tm).c, arm, bot, t, k * 3, k);
+      drv[k] = podDriver.tip;
+    });
+    [2, 3, 1].forEach(k => { const p = podList[k - 1]; podBlock(x, k, p ? Object.assign({ show: (T - POD[k].rev - 0.5) / 0.8 }, p) : null, lit); });
+    // 香檳噴灑
+    if (T > 13.2) for (const k in drv) {
+      const tip = drv[k]; if (!tip) continue;
+      for (let i = 0; i < 5; i++) {
+        const a = tip[2] + rnd(-0.22, 0.22), sp = rnd(700, 1200);
+        parts.push({ k: 's', x: tip[0], y: tip[1], vx: Math.sin(a) * sp, vy: -Math.cos(a) * sp, life: 0, max: rnd(0.5, 0.85), s: rnd(4, 9) });
+      }
+    }
+    // 彩帶砲／煙火／閃光
+    const fire = (at, fn) => { if (podLast < at && T >= at) fn(); };
+    fire(8.1, () => { podConfetti(80, FLOOR, 1, 160); podConfetti(W - 80, FLOOR, -1, 160); });
+    fire(13.3, () => { podConfetti(80, FLOOR, 1, 140); podConfetti(W - 80, FLOOR, -1, 140); });
+    if (T > 8.2 && Math.random() < dt * 1.6) podFirework(rnd(300, 1620), rnd(120, 380));
+    if (T > 8.2 && Math.random() < dt * 25) parts.push({ k: 'c', x: rnd(0, W), y: -20, vx: rnd(-40, 40), vy: rnd(60, 160), r: Math.random() * 6, vr: rnd(-6, 6), c: ['#ffd60a', '#ffffff', '#e2b33a'][Math.floor(Math.random() * 3)], s: rnd(8, 14), life: 0 });
+    if (T > 1.5 && Math.random() < dt * (T > 8 ? 14 : 5)) flashes.push({ x: rnd(40, W - 40), y: rnd(930, 1060), life: 0 });
+    podLast = T;
+    // 更新與繪製粒子
+    x.save(); x.globalCompositeOperation = 'lighter';
+    fworks = fworks.filter(p => (p.life += dt) < p.max);
+    for (const p of fworks) {
+      p.vy += 260 * dt; p.vx *= 0.985; p.vy *= 0.985; p.x += p.vx * dt; p.y += p.vy * dt;
+      x.globalAlpha = 1 - p.life / p.max; x.fillStyle = p.c; x.fillRect(p.x - 3, p.y - 3, 6, 6);
+    }
+    x.globalAlpha = 1;
+    parts = parts.filter(p => p.k === 'c' ? p.y < H + 40 : (p.life += dt) < p.max);
+    for (const p of parts) if (p.k === 's') {
+      p.vy += 1500 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+      x.globalAlpha = 0.75 * (1 - p.life / p.max); x.fillStyle = p.life < 0.15 ? '#ffffff' : '#fff1c4';
+      x.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
+    }
+    x.restore();
+    for (const p of parts) if (p.k === 'c') {
+      p.vy += 700 * dt; p.vx *= 0.985; if (p.vy > 220) p.vy = 220 + (p.vy - 220) * 0.9;
+      p.x += p.vx * dt + Math.sin(t * 3 + p.r) * 0.6; p.y += p.vy * dt; p.r += p.vr * dt;
+      const cs = Math.cos(p.r) * Q, sn = Math.sin(p.r) * Q;
+      x.setTransform(cs, sn, -sn, cs, p.x * Q, p.y * Q); x.fillStyle = p.c; x.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2);
+    }
+    x.setTransform(Q, 0, 0, Q, 0, 0);
+    // 開場暗場＋聚光燈
+    const dark = 0.86 * (1 - lit);
+    if (dark > 0.01) { x.fillStyle = `rgba(0,0,0,${dark})`; x.fillRect(0, 0, W, H); }
+    x.save(); x.globalCompositeOperation = 'lighter';
+    if (T < 2.2) {                               // 開場探照燈掃過
+      for (let i = 0; i < 2; i++) {
+        const sx = 960 + Math.sin(T * 2.2 + i * 2.5) * 700;
+        const g = x.createLinearGradient(sx, 0, sx, H); g.addColorStop(0, 'rgba(200,220,255,.35)'); g.addColorStop(1, 'rgba(200,220,255,0)');
+        x.fillStyle = g; x.beginPath(); x.moveTo(sx - 30, 0); x.lineTo(sx + 30, 0); x.lineTo(sx + 260, H); x.lineTo(sx - 260, H); x.closePath(); x.fill();
+      }
+    }
+    [3, 2, 1].forEach(k => {
+      const b = POD[k], e = ease((T - b.rev) / 0.6);
+      if (e <= 0 || !podList[k - 1]) return;
+      const a = (k === 1 ? 0.45 : 0.3) * e * (1 - lit * 0.5), gl = METAL[k].glow;
+      const g = x.createLinearGradient(b.x, 0, b.x, FLOOR);
+      g.addColorStop(0, `rgba(${gl},${a})`); g.addColorStop(1, `rgba(${gl},${a * 0.25})`);
+      x.fillStyle = g; x.beginPath(); x.moveTo(b.x - 50, 0); x.lineTo(b.x + 50, 0); x.lineTo(b.x + 260, FLOOR); x.lineTo(b.x - 260, FLOOR); x.closePath(); x.fill();
+    });
+    flashes = flashes.filter(f => (f.life += dt) < 0.18);
+    for (const f of flashes) {
+      const a = 1 - f.life / 0.18, g = x.createRadialGradient(f.x, f.y, 0, f.x, f.y, 70);
+      g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.fillRect(f.x - 70, f.y - 70, 140, 140);
+    }
+    x.restore();
+    podCrowd(x, t);
+    // CHAMPION 字幕
+    const ca = ease((T - 8.6) / 0.8);
+    if (ca > 0 && podList[0]) {
+      x.save(); x.globalAlpha = ca; x.textAlign = 'center'; x.textBaseline = 'middle';
+      const s = 1 + (1 - ca) * 0.6; x.translate(960, 62); x.scale(s, s);
+      const champ = GS.sprite('champ|' + (document.fonts && document.fonts.status), 840, 160, (c) => {
+        c.translate(420, 80); c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillStyle = 'rgba(0,0,0,.65)'; GS.rr(c, -380, -48, 760, 96, 20); c.fill();
+        const g = c.createLinearGradient(0, -50, 0, 50); g.addColorStop(0, '#fff6c4'); g.addColorStop(0.5, '#ffd60a'); g.addColorStop(1, '#c98a00');
+        c.fillStyle = g; c.shadowColor = '#ffb300'; c.shadowBlur = 30;
+        c.font = 'italic 900 72px Orbitron, sans-serif'; c.fillText('CHAMPION', 0, 4);
+      });
+      x.drawImage(champ, -420, -80);
+      x.restore();
+    }
   }
 
   let teamTimers = [];
@@ -377,10 +701,13 @@ body{color:#fff;font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;curso
   let lastT = performance.now(), idleD = 0, logoImg = null, logoSrc = '', lastLapShown = -1, lightsGo = 0;
   function frame(tn) {
     requestAnimationFrame(frame);
-    const dt = Math.min(0.05, (tn - lastT) / 1000); lastT = tn;
+    const dtRaw = (tn - lastT) / 1000, dt = Math.min(0.05, dtRaw); lastT = tn;
+    qMonitor(dtRaw);
+    ctx.setTransform(Q, 0, 0, Q, 0, 0);
     const t = tn / 1000, now = db.now(), s = game.status || 'lobby';
     route();
-    if (cfg.logo !== logoSrc) { logoSrc = cfg.logo; logoImg = null; if (logoSrc) { logoImg = new Image(); logoImg.src = logoSrc; } }
+    const lg = game.logo || cfg.logo || '';
+    if (lg !== logoSrc) { logoSrc = lg; logoImg = null; if (logoSrc) { logoImg = new Image(); logoImg.src = logoSrc; } }
     const base = { tr, horizon: 0.42, fov: 84, drawN: 220, t, brand: cfg.brand, logoImg };
 
     if (view === 'lLobby') {

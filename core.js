@@ -381,6 +381,13 @@
     if (!spriteCache[key]) { const c = document.createElement('canvas'); c.width = w; c.height = h; fn(c.getContext('2d'), w, h); spriteCache[key] = c; }
     return spriteCache[key];
   }
+  // 字型載入完成後，清掉含文字的快取貼圖（避免快取到還沒載入的字型）
+  if (document.fonts) {
+    const clearText = () => { for (const k in spriteCache) if (k.startsWith('board')) delete spriteCache[k]; };
+    document.fonts.ready.then(clearText);
+    try { document.fonts.addEventListener('loadingdone', clearText); } catch (e) { }
+  }
+  GS.sprite = sprite;
   function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
   GS.rr = rr;
 
@@ -522,20 +529,23 @@
     const HZ = H * (o.horizon || 0.42), DEPTH = 1 / Math.tan((o.fov || 90) * Math.PI / 360), HW = W / 2;
     const camZ = o.camD, camY = GS.hillAt(camZ) + (o.camH || 4), camX = o.camX || 0, t = o.t || 0;
 
-    // 天空
-    let g = ctx.createLinearGradient(0, 0, 0, HZ);
-    g.addColorStop(0, '#05030f'); g.addColorStop(0.55, '#1c0b3a'); g.addColorStop(0.85, '#4a1250'); g.addColorStop(1, '#8a1f55');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, HZ + 2);
+    // 天空（漸層＋地平線光暈＋暗角都預先畫好快取，每格只貼圖）
+    const skyBg = sprite('skybg' + W + 'x' + Math.round(HZ), W, Math.ceil(HZ) + 2, (c) => {
+      const g = c.createLinearGradient(0, 0, 0, HZ);
+      g.addColorStop(0, '#05030f'); g.addColorStop(0.55, '#1c0b3a'); g.addColorStop(0.85, '#4a1250'); g.addColorStop(1, '#8a1f55');
+      c.fillStyle = g; c.fillRect(0, 0, W, HZ + 2);
+      const g2 = c.createRadialGradient(W * 0.5, HZ, 10, W * 0.5, HZ, W * 0.6);
+      g2.addColorStop(0, 'rgba(255,60,120,.45)'); g2.addColorStop(1, 'rgba(255,60,120,0)');
+      c.fillStyle = g2; c.fillRect(0, HZ - W * 0.3, W, W * 0.3);
+    });
+    ctx.drawImage(skyBg, 0, 0);
+    let g;
     for (let i = 0; i < 90; i++) {
       const x = hash(i) * W, y = hash(i + 50) * HZ * 0.6, b = hash(i + 7);
       ctx.globalAlpha = (0.3 + 0.6 * b) * (0.6 + 0.4 * Math.sin(t * (1 + b * 2) + i)); ctx.fillStyle = '#fff';
       ctx.fillRect(x, y, b > 0.9 ? 2 : 1.2, b > 0.9 ? 2 : 1.2);
     }
     ctx.globalAlpha = 1;
-    // 地平線光暈
-    g = ctx.createRadialGradient(W * 0.5, HZ, 10, W * 0.5, HZ, W * 0.6);
-    g.addColorStop(0, 'rgba(255,60,120,.45)'); g.addColorStop(1, 'rgba(255,60,120,0)');
-    ctx.fillStyle = g; ctx.fillRect(0, HZ - W * 0.3, W, W * 0.3);
     // 天際線
     const sk = W / 1600;
     for (let L = 0; L < 2; L++) {
@@ -650,10 +660,12 @@
       }
       ctx.restore();
     }
-    // 暗角
-    g = ctx.createRadialGradient(W / 2, H * 0.55, Math.min(W, H) * 0.3, W / 2, H * 0.55, Math.max(W, H) * 0.75);
-    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.55)');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // 暗角（快取）
+    ctx.drawImage(sprite('vig' + W + 'x' + H, W, H, (c) => {
+      const g2 = c.createRadialGradient(W / 2, H * 0.55, Math.min(W, H) * 0.3, W / 2, H * 0.55, Math.max(W, H) * 0.75);
+      g2.addColorStop(0, 'rgba(0,0,0,0)'); g2.addColorStop(1, 'rgba(0,0,0,.55)');
+      c.fillStyle = g2; c.fillRect(0, 0, W, H);
+    }), 0, 0);
   };
 
   GS.drawLamp = function (ctx, p, fog, side) {
@@ -662,10 +674,14 @@
     ctx.fillStyle = `rgba(60,64,80,${1 - fog})`; ctx.fillRect(p.x - w / 2, p.y - h, w, h);
     ctx.fillRect(p.x, p.y - h, -side * p.s * 1.4, w);
     const lx = p.x - side * p.s * 1.4, ly = p.y - h;
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    const r = p.s * 2.6, g = ctx.createRadialGradient(lx, ly, 0, lx, ly, r);
-    g.addColorStop(0, `rgba(255,240,200,${0.9 * (1 - fog)})`); g.addColorStop(0.2, `rgba(255,180,90,${0.35 * (1 - fog)})`); g.addColorStop(1, 'rgba(255,140,60,0)');
-    ctx.fillStyle = g; ctx.fillRect(lx - r, ly - r, r * 2, r * 2); ctx.restore();
+    const r = p.s * 2.6;
+    const glow = sprite('lampglow', 128, 128, (c) => {
+      const g = c.createRadialGradient(64, 64, 0, 64, 64, 64);
+      g.addColorStop(0, 'rgba(255,240,200,.9)'); g.addColorStop(0.2, 'rgba(255,180,90,.35)'); g.addColorStop(1, 'rgba(255,140,60,0)');
+      c.fillStyle = g; c.fillRect(0, 0, 128, 128);
+    });
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1 - fog;
+    ctx.drawImage(glow, lx - r, ly - r, r * 2, r * 2); ctx.restore();
   };
 
   GS.drawChevron = function (ctx, p, fog, dir, t) {
@@ -687,21 +703,27 @@
     const w = p.s * 9, h = p.s * 3.4, x = p.x - w / 2, y = p.y - h - p.s * 2.4;
     const a = 1 - fog;
     ctx.fillStyle = `rgba(40,42,54,${a})`; ctx.fillRect(p.x - w * 0.35, y + h, p.s * 0.25, p.s * 2.4); ctx.fillRect(p.x + w * 0.35, y + h, p.s * 0.25, p.s * 2.4);
-    const nc = ['#ff2d55', '#19e3ff', '#ffc21a', '#b44dff'][Math.floor(hash(idx) * 4)];
+    const ci = Math.floor(hash(idx) * 4), nc = ['#ff2d55', '#19e3ff', '#ffc21a', '#b44dff'][ci];
+    const img = o.logoImg, useLogo = !!(img && img.complete && img.naturalWidth && hash(idx + 1) > 0.35);
+    // 看板整面預先畫成貼圖（含霓虹光暈），每格只縮放貼上
+    const key = 'board' + ci + '|' + (useLogo ? 'L' + (img.src.length + ':' + img.src.slice(-24)) : 'T' + (o.brand || ''));
+    const bw = 360, bh = 136, pad = 14;
+    const spr = sprite(key, bw + pad * 2, bh + pad * 2, (c) => {
+      c.fillStyle = '#0a0b12'; c.fillRect(pad, pad, bw, bh);
+      c.shadowColor = nc; c.shadowBlur = 14; c.strokeStyle = nc; c.lineWidth = 6; c.strokeRect(pad, pad, bw, bh); c.shadowBlur = 0;
+      if (useLogo) {
+        const k = Math.min((bw * 0.86) / img.naturalWidth, (bh * 0.8) / img.naturalHeight);
+        c.drawImage(img, pad + bw / 2 - img.naturalWidth * k / 2, pad + bh / 2 - img.naturalHeight * k / 2, img.naturalWidth * k, img.naturalHeight * k);
+      } else {
+        c.fillStyle = nc; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.font = `italic 900 ${bh * 0.42}px "Orbitron","Noto Sans TC",sans-serif`;
+        c.shadowColor = nc; c.shadowBlur = 10;
+        c.fillText(o.brand || 'FULL SPRINT', pad + bw / 2, pad + bh / 2, bw * 0.9);
+      }
+    });
+    const k2 = w / bw;
     ctx.save(); ctx.globalAlpha = a;
-    ctx.fillStyle = '#0a0b12'; ctx.fillRect(x, y, w, h);
-    ctx.shadowColor = nc; ctx.shadowBlur = p.s * 1.2; ctx.strokeStyle = nc; ctx.lineWidth = Math.max(1, p.s * 0.18); ctx.strokeRect(x, y, w, h);
-    ctx.shadowBlur = 0;
-    const img = o.logoImg;
-    if (img && img.complete && img.naturalWidth && hash(idx + 1) > 0.35) {
-      const k = Math.min((w * 0.86) / img.naturalWidth, (h * 0.8) / img.naturalHeight);
-      ctx.drawImage(img, p.x - img.naturalWidth * k / 2, y + h / 2 - img.naturalHeight * k / 2, img.naturalWidth * k, img.naturalHeight * k);
-    } else if (h > 6) {
-      ctx.fillStyle = nc; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = `italic 900 ${h * 0.42}px "Orbitron","Noto Sans TC",sans-serif`;
-      ctx.shadowColor = nc; ctx.shadowBlur = p.s;
-      ctx.fillText(o.brand || 'FULL SPRINT', p.x, y + h / 2, w * 0.9);
-    }
+    ctx.drawImage(spr, x - pad * k2, y - pad * k2, (bw + pad * 2) * k2, (bh + pad * 2) * k2);
     ctx.restore();
   };
 
@@ -717,7 +739,7 @@
     for (let k = 0; k < cols; k++) for (let j = 0; j < 1; j++) { if (k % 2) continue; ctx.fillStyle = '#e8e8e8'; ctx.fillRect(l.x + k * cell, y + bh - cell, Math.min(cell, r.x - l.x - k * cell), cell); }
     for (let k = 0; k < cols; k++) { if (!(k % 2)) continue; ctx.fillStyle = '#e8e8e8'; ctx.fillRect(l.x + k * cell, y, Math.min(cell, r.x - l.x - k * cell), cell); }
     ctx.fillStyle = '#ffd60a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = `italic 900 ${cell * 1.0}px "Orbitron",sans-serif`; ctx.shadowColor = '#ff9f0a'; ctx.shadowBlur = l.s * 0.6;
+    ctx.font = `italic 900 ${cell * 1.0}px "Orbitron",sans-serif`;
     ctx.fillText(label, (l.x + r.x) / 2, y + bh / 2, (r.x - l.x) * 0.9);
     ctx.restore();
   };

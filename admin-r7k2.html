@@ -59,6 +59,9 @@ td.r,th.r{text-align:right}
 .sw{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
 .bar{height:8px;border-radius:8px;background:#0a0912;overflow:hidden}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,#1e6bff,#19e3ff)}
+.logoBox #logoPrev{width:220px;height:90px;flex:none;border-radius:10px;background:repeating-conic-gradient(#1b1b28 0 25%,#12121c 0 50%) 0 0/16px 16px;
+  border:1px solid var(--line);display:grid;place-items:center;color:var(--mut);font-size:12px;overflow:hidden;padding:6px}
+.logoBox #logoPrev img{display:block;width:100%;height:100%;object-fit:contain}
 .saveBar{position:sticky;bottom:0;padding:12px 20px;background:rgba(10,9,18,.95);border-top:1px solid var(--line);display:flex;gap:12px;align-items:center;z-index:5}
 .saveBar span{color:var(--mut);font-size:13px}
 </style>
@@ -134,7 +137,19 @@ td.r,th.r{text-align:right}
           <label><input type="checkbox" id="cPrac"> 🎮 開放試玩</label>
         </div>
         <label>路邊看板文字</label><input id="cBrand" maxlength="24">
-        <label>看板 Logo 圖檔（選填）</label><input id="cLogo" placeholder="例：logo.png">
+        <input id="cLogo" type="hidden">
+        <div class="full logoBox">
+          <label>看板 Logo（選填，會出現在路邊看板和頒獎背板）</label>
+          <div class="row" style="margin-top:6px">
+            <div id="logoPrev">尚未上傳</div>
+            <div style="display:grid;gap:8px">
+              <button class="cyan sm" id="logoPick">📁 選擇圖片上傳</button>
+              <button class="ghost sm" id="logoDel">移除 Logo</button>
+            </div>
+          </div>
+          <input type="file" id="logoFile" accept="image/*" hidden>
+          <div class="hint" id="logoHint" style="margin-top:6px">建議用去背 PNG、橫式 Logo；上傳時會自動壓縮，選好就立即生效，不用按儲存。</div>
+        </div>
       </div>
       <div class="hint" id="estHint"></div>
     </section>
@@ -288,7 +303,7 @@ td.r,th.r{text-align:right}
       $('bPodium').textContent = show === 'podium' ? '🏆 收起頒獎台' : '🏆 揭曉頒獎台';
       $('bTeams').textContent = show === 'teams' ? '🚩 收起車隊排名' : '🚩 公布車隊排名';
       const lock = !(ph === 'lobby');
-      document.querySelectorAll('main input, main select, main textarea, #bSave, #addTeam, #bRoster, .teamRow button').forEach(el => {
+      document.querySelectorAll('main input, main select, main textarea, #bSave, #addTeam, #bRoster, .teamRow button, #logoPick, #logoDel').forEach(el => {
         if (el.id === 'botN' || el.id === 'rsNames' || el.id === 'rsRoster') return; el.disabled = lock;
       });
       $('saveHint').textContent = lock ? '比賽進行中，設定已鎖定' : (formDirty ? '⚠ 有尚未儲存的修改' : '設定只在「等待中」可以修改');
@@ -312,7 +327,7 @@ td.r,th.r{text-align:right}
 
     /* ───── 設定 ───── */
     let formDirty = false;
-    document.querySelector('main').addEventListener('input', e => { if (e.target.closest('#roster') || e.target.id === 'botN') return; formDirty = true; render(); });
+    document.querySelector('main').addEventListener('input', e => { if (e.target.closest('#roster') || e.target.id === 'botN' || e.target.id === 'logoFile' || e.target.id === 'rsNames' || e.target.id === 'rsRoster') return; formDirty = true; render(); });
     let teamsEdit = [];
     function teamRowsHTML() {
       $('teamRows').innerHTML = teamsEdit.map((t, i) => `<div class="teamRow">
@@ -359,6 +374,35 @@ td.r,th.r{text-align:right}
     ['cLap', 'cC0', 'cC1', 'cC2'].forEach(id => $(id).addEventListener('input', est));
     async function saveCfg() { const c = readForm(); await aw(() => db.update(P('game'), { cfg: c })); formDirty = false; render(); }
     $('bSave').onclick = async () => { await saveCfg(); $('saveHint').textContent = '✅ 設定已儲存'; };
+
+    /* ───── Logo 上傳（壓縮後存在 game/logo） ───── */
+    let logoShown = null;
+    setInterval(() => {
+      const lg = (game && game.logo) || '';
+      if (lg === logoShown) return; logoShown = lg;
+      $('logoPrev').innerHTML = lg ? `<img src="${lg}">` : '尚未上傳';
+    }, 500);
+    $('logoPick').onclick = () => $('logoFile').click();
+    $('logoFile').onchange = async e => {
+      const f = e.target.files && e.target.files[0]; e.target.value = '';
+      if (!f) return;
+      $('logoHint').textContent = '處理中…';
+      try {
+        const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(f); });
+        const k = Math.min(1, 800 / img.naturalWidth, 320 / img.naturalHeight);
+        const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        let url = c.toDataURL('image/webp', 0.9);
+        if (!url.startsWith('data:image/webp')) url = c.toDataURL('image/png');
+        await aw(() => db.set(P('game/logo'), url));
+        $('logoHint').textContent = `✅ 已上傳（${c.width}×${c.height}，約 ${Math.round(url.length / 1024)} KB），投影和手機會自動更新`;
+      } catch (err) { console.error(err); $('logoHint').textContent = '❌ 這個檔案讀不到，請換 PNG 或 JPG 再試一次'; }
+    };
+    $('logoDel').onclick = async () => {
+      if (!(game && game.logo)) return;
+      if (!confirm('確定移除 Logo？')) return;
+      await aw(() => db.set(P('game/logo'), null)); $('logoHint').textContent = 'Logo 已移除';
+    };
 
     /* ───── 名單匯入 ───── */
     async function refreshRosterCount() { let n = 0; try { n = await db.get(P('rosterN')) || 0; } catch (e) { } $('rosterHint').textContent = n ? `目前名單 ${n} 筆` : '目前沒有名單'; }

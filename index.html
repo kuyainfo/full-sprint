@@ -681,7 +681,7 @@ input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(25,2
     }
   }
   let logoImg = null, logoSrc = '';
-  setInterval(() => { if (cfg.logo !== logoSrc) { logoSrc = cfg.logo; logoImg = null; if (logoSrc) { const im = new Image(); im.src = logoSrc; logoImg = im; } } }, 1000);
+  setInterval(() => { const lg = game.logo || cfg.logo || ''; if (lg !== logoSrc) { logoSrc = lg; logoImg = null; if (logoSrc) { const im = new Image(); im.src = logoSrc; logoImg = im; } } }, 1000);
 
   fillJoin(); applyCfgUI(); resize();
   requestAnimationFrame(frame);
