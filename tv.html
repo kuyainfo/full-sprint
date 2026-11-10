@@ -105,7 +105,7 @@ body{color:#fff;font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;curso
 
 /* 頒獎台 */
 .pod{background:#020205}
-.pod canvas{position:absolute;inset:0}
+.pod canvas{position:absolute;left:0;top:0;width:1920px;height:1080px}
 
 /* 車隊排名 */
 .tv{background:radial-gradient(ellipse at 50% 20%,rgba(10,30,60,.95),rgba(3,3,8,.98) 70%)}
@@ -189,9 +189,9 @@ body{color:#fff;font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;curso
   const cv = $('cv'), ctx = cv.getContext('2d', { alpha: false }), W = 1920, H = 1080;
   /* 畫質自動調整：投影電腦跑不動時，自動降低內部解析度（畫面一樣滿版，只是稍微柔一點）
      網址加 ?q=0.67 可以固定畫質（1＝原生 1080p） */
-  const QLV = [1, 0.8, 0.67, 0.5];
+  const QLV = [1, 0.8, 0.67];
   const qForce = parseFloat(new URLSearchParams(location.search).get('q'));
-  let qi = 0, Q = 1, qAcc = 0, qN = 0, qWarm = 0;
+  let qi = 0, Q = 1, qAcc = 0, qN = 0, qWarm = 0, qBad = 0;
   function setQ(q) {
     Q = q;
     for (const c of [cv, $('podCv')]) { c.width = Math.round(W * q); c.height = Math.round(H * q); }
@@ -201,10 +201,12 @@ body{color:#fff;font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;curso
     if (qForce > 0) return;
     if (document.hidden) return;
     if (++qWarm < 60) return;                  // 前 1 秒不算（載入中）
+    if (dtRaw > 0.2) return;                   // 視窗被遮住或切換時的長停頓不算
     qAcc += dtRaw; qN++;
-    if (qN < 90) return;
+    if (qN < 120) return;
     const avg = qAcc / qN; qAcc = 0; qN = 0;
-    if (avg > 0.024 && qi < QLV.length - 1) { qi++; setQ(QLV[qi]); qWarm = 0; console.log('[全速衝刺] 自動降低畫質 →', QLV[qi]); }
+    qBad = avg > 0.026 ? qBad + 1 : 0;         // 連續兩次（約 4 秒）都偏慢才降
+    if (qBad >= 2 && qi < QLV.length - 1) { qi++; qBad = 0; setQ(QLV[qi]); qWarm = 0; console.log('[全速衝刺] 自動降低畫質 →', QLV[qi]); }
   }
 
   let game = {}, cfg = GS.cfgOf(null), tr = GS.track(cfg), round = 0, fin = null, tcount = {}, total = 0, tstat = {}, top = [], results = null;

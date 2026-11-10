@@ -535,7 +535,10 @@ td.r,th.r{text-align:right}
         const k = 'bot_' + round + '_' + (startI + i);
         const tb = tl[Math.floor(Math.random() * tl.length)] || '1';
         const tm = cfg.teamMode === 'table' ? GS.teamOfTable(cfg, tb) : (startI + i) % cfg.teams.length;
-        const b = { k, n: '測試_' + (startI + i + 1), tb, tm, d: 0, f: 0, v: 0, pc: 0, skill: 0.75 + Math.random() * 0.35, pause: 0, e: '', ec: 0 };
+        // 每台測試車用跟玩家一樣的物理引擎駕駛，技術隨機（反應、5 檔控速、過彎放油門）
+        const sk = Math.random();
+        const b = { k, n: '測試_' + (startI + i + 1), tb, tm, f: 0, e: '', ec: 0, car: null, lastSend: -Math.random() * 1500,
+          react: 0.1 + (1 - sk) * 0.35, feather: 0.35 + sk * 0.6, curveOk: 0.55 + sk * 0.43, launch: 0.15 + Math.random() * 0.5, seenZ: -1, cIdx: -1, relC: true };
         bots.push(b); add[k] = { n: b.n, tb, tm, d: 0, v: 0, s: 0, f: 0, pc: 0, e: '', ec: 0, t: Math.round(db.now()) };
         tAdd[tm] = (tAdd[tm] || 0) + 1;
       }
@@ -543,34 +546,53 @@ td.r,th.r{text-align:right}
       await db.txn(P('counts/' + round), c => (c || 0) + n);
       for (const tm in tAdd) await db.txn(P('tcount/' + round + '/' + tm), c => (c || 0) + tAdd[tm]);
       $('bBotStop').disabled = false;
-      if (!botTimer) botTimer = setInterval(botTick, 1500);
+      if (!botTimer) { botLast = performance.now(); botTimer = setInterval(botTick, 100); }
     };
     $('bBotStop').onclick = stopBots;
     function stopBots() { clearInterval(botTimer); botTimer = null; bots = []; $('bBotStop').disabled = true; }
+    let botLast = 0, botBusy = false;
+    function botDrive(b, now, dt) {
+      const c = b.car;
+      if (!c.go) { if (now >= (game.startAt || 0) + b.launch * 1000) { c.start(game.startAt || now); c.setHold(true, now); } else return; }
+      if (c.done) return;
+      const [lo, hi] = c.zone();
+      if (c.g < 5 && c.rpm >= lo) { if (b.seenZ < 0) b.seenZ = now; if (now - b.seenZ >= b.react * 1000) { c.shift(now); b.seenZ = -1; } } else b.seenZ = -1;
+      if (c.ci !== b.cIdx) { b.cIdx = c.ci; b.relC = Math.random() < b.curveOk; }
+      let hold = true;
+      if (c.g === 5) hold = Math.random() < b.feather ? c.rpm < (lo + hi) / 2 : Math.random() < 0.6;
+      if (((c.warn && c.warn.dist < 20) || c.inCurve) && b.relC) hold = false;
+      if (hold !== c.hold) c.setHold(hold, now);
+      const ts = tsLive[b.tm]; c.nitroUntil = ts && ts.nu || 0;
+      c.step(dt, now);
+    }
     async function botTick() {
-      if (!game || game.status !== 'racing') return;
+      const tn = performance.now(), real = Math.min(1, (tn - botLast) / 1000); botLast = tn;
+      if (!game || game.status !== 'racing' || botBusy) return;
       const now = db.now();
-      if (now < (game.startAt || 0) || now >= GS.endAt(game, fin)) return;
-      const up = {};
-      for (const b of bots) {
-        if (b.f) continue;
-        const inCurve = tr.curves.some(c => b.d >= c.s && b.d <= c.s + c.len);
-        let v = 52 * b.skill * (0.85 + Math.random() * 0.3);
-        if (inCurve) v = 30;
-        if (now < (tsLive[b.tm] && tsLive[b.tm].nu || 0)) v *= 1.35;
-        if (b.pause > now) v = 4;
-        else if (Math.random() < 0.06) { b.pause = now + 1500; b.e = Math.random() < 0.5 ? 'st' : 'sl'; b.ec++; }
-        else if (Math.random() < 0.3 * b.skill) { b.pc++; b.e = 'pf'; b.ec++; }
-        const elapsed = Math.min(1.5, (now - (game.startAt || now)) / 1000);
-        b.v = v; b.d = Math.min(tr.total, b.d + v * elapsed);
-        if (b.d >= tr.total && !b.f) {
-          const r = await db.txn(P('finish/' + round), c => { c = c || {}; c.count = (c.count || 0) + 1; if (!c.firstAt) c.firstAt = Math.round(db.now()); return c; });
-          if (r.committed && r.val) b.f = r.val.count;
+      if (now >= GS.endAt(game, fin)) return;
+      botBusy = true;
+      try {
+        const up = {};
+        for (const b of bots) {
+          if (!b.car) b.car = new GS.Car(tr, cfg.mech, k => { const m = { perfect: 'pf', stall: 'st', slip: 'sl', launch: 'lc', corner: 'cr' }[k]; if (m) { b.e = m; b.ec++; } });
+          if (b.f) continue;
+          // 分成 50ms 小步計算（背景分頁被降速時也不會亂跳）
+          let left = real;
+          while (left > 0.0001) { const st = Math.min(0.05, left); botDrive(b, now - (left - st) * 1000, st); left -= st; }
+          if (b.car.done && !b.f) {
+            const r = await db.txn(P('finish/' + round), c => { c = c || {}; c.count = (c.count || 0) + 1; if (!c.firstAt) c.firstAt = Math.round(db.now()); return c; });
+            if (r.committed && r.val) b.f = r.val.count;
+            b.lastSend = 0;
+          }
+          if (now - b.lastSend >= 1500) {      // 跟真人一樣每 1.5 秒回報一次
+            b.lastSend = now;
+            const d = Math.floor(b.car.d);
+            up[b.k] = { n: b.n, tb: b.tb, tm: b.tm, d, v: Math.round(b.car.v * 10), s: GS.score(d, b.f), f: b.f, pc: b.car.pc, e: b.e, ec: b.ec, t: Math.round(now) };
+          }
         }
-        const d = Math.floor(b.d);
-        up[b.k] = { n: b.n, tb: b.tb, tm: b.tm, d, v: Math.round(v * 10), s: GS.score(d, b.f), f: b.f, pc: b.pc, e: b.e, ec: b.ec, t: Math.round(now) };
-      }
-      if (Object.keys(up).length) await db.update(P('players'), up);
+        if (Object.keys(up).length) await db.update(P('players'), up);
+      } catch (e) { console.error(e); }
+      botBusy = false;
     }
   }
 })();
