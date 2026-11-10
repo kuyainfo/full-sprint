@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>全速衝刺｜後台</title>
+<style>
+:root{--bg:#0a0912;--card:#14131f;--line:#2b2a3d;--red:#ff2d55;--cyan:#19e3ff;--yel:#ffd60a;--txt:#eef0fa;--mut:#9a9fbb;--green:#2dd47a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:'Microsoft JhengHei','PingFang TC','Noto Sans TC',sans-serif;font-size:15px;min-height:100vh}
+#login{max-width:340px;margin:18vh auto;padding:0 16px;text-align:center}
+#login h1{color:var(--red);letter-spacing:.2em;margin-bottom:20px;font-style:italic}
+input,select,textarea{font:inherit;background:#0a0912;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+textarea{min-height:110px;font-size:13px;font-family:Consolas,monospace}
+input[type=color]{padding:2px;height:36px}
+input[type=checkbox]{width:auto}
+button{font:inherit;cursor:pointer;border:none;border-radius:10px;padding:11px 16px;font-weight:700;color:#fff;background:var(--red);letter-spacing:.05em}
+button:disabled{opacity:.3;cursor:not-allowed}
+button.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+button.green{background:var(--green);color:#03150b}
+button.cyan{background:var(--cyan);color:#04121a}
+button.yel{background:var(--yel);color:#1a1400}
+button.sm{padding:6px 10px;font-size:13px}
+#login button{width:100%;margin-top:10px}
+.err{color:var(--red);min-height:20px;margin-top:8px}
+header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:20px;color:var(--red);letter-spacing:.15em;font-style:italic}
+.pill{font-size:12px;padding:3px 10px;border-radius:20px;background:#2b2a3d}
+.pill.local{background:#a8002a}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block}
+.dot.off{background:var(--red)}
+main{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px;padding:16px 20px 40px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.card h2{font-size:15px;color:var(--cyan);letter-spacing:.12em;margin-bottom:12px}
+.card.wide{grid-column:1/-1}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:#0a0912;border-radius:10px;padding:10px;text-align:center}
+.stat b{display:block;font-size:26px;color:var(--yel)}
+.stat span{font-size:12px;color:var(--mut)}
+.stat.wide{grid-column:span 3;font-size:18px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btns button{padding:15px 10px;font-size:16px}
+.hint{font-size:12px;color:var(--mut);margin-top:10px;line-height:1.7}
+.form{display:grid;grid-template-columns:1fr 210px;gap:9px 12px;align-items:center}
+.form label{color:var(--mut)}
+.form .full{grid-column:span 2}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.chk{grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chk label{display:flex;gap:8px;align-items:center;background:#0a0912;padding:8px 10px;border-radius:8px;color:var(--txt)}
+table{width:100%;border-collapse:collapse}
+td,th{padding:6px 6px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}
+th{color:var(--mut);font-weight:400}
+td.r,th.r{text-align:right}
+.links a{display:block;color:var(--yel);margin:6px 0;word-break:break-all}
+.row{display:flex;gap:10px;align-items:center}
+.row input{width:90px}
+.teamRow{display:grid;grid-template-columns:1fr 54px 1fr 34px;gap:6px;margin-bottom:6px;align-items:center}
+.sw{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.bar{height:8px;border-radius:8px;background:#0a0912;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#1e6bff,#19e3ff)}
+.saveBar{position:sticky;bottom:0;padding:12px 20px;background:rgba(10,9,18,.95);border-top:1px solid var(--line);display:flex;gap:12px;align-items:center;z-index:5}
+.saveBar span{color:var(--mut);font-size:13px}
+</style>
+</head>
+<body>
+<div id="login">
+  <h1>全速衝刺 後台</h1>
+  <input id="pw" type="password" placeholder="管理密碼">
+  <button id="loginBtn">進入</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <h1>全速衝刺 後台</h1>
+    <span class="pill" id="modeTag"></span>
+    <span><span class="dot" id="conn"></span> 連線</span>
+  </header>
+  <main>
+    <section class="card">
+      <h2>目前狀態</h2>
+      <div class="stats">
+        <div class="stat wide"><span>第 <b style="display:inline;font-size:22px" id="sRound">-</b> 局</span>　<b style="display:inline;font-size:22px" id="sStatus">-</b></div>
+        <div class="stat"><b id="sJoined">0</b><span>已進場</span></div>
+        <div class="stat"><b id="sFin">0</b><span>已衝線</span></div>
+        <div class="stat"><b id="sLeft">-</b><span>剩餘秒數</span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>比賽控制</h2>
+      <div class="btns">
+        <button id="bGrid" class="cyan">🚦 進入發車</button>
+        <button id="bStart" class="green">▶ 開始比賽（亮燈）</button>
+        <button id="bForce">■ 強制結束</button>
+        <button id="bNew" class="ghost">↻ 開新一局</button>
+        <button id="bPodium" class="yel">🏆 揭曉頒獎台</button>
+        <button id="bTeams" class="yel">🚩 公布車隊排名</button>
+      </div>
+      <div class="hint">
+        進入發車：結束所有人的試玩，手機與投影進入起跑線。<br>
+        開始比賽：五顆紅燈依序亮起，隨機 0.4–1.4 秒後熄滅開跑。<br>
+        第一名衝線後自動倒數，時間到自動結算（<b>比賽中後台必須開著</b>，車隊平均、氮氣、即時名次都由這頁計算）。<br>
+        結算後：投影先列前 10 名 → 按「揭曉頒獎台」依 3→2→1 揭曉 → 再按「公布車隊排名」。
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>車隊即時狀況</h2>
+      <table><thead><tr><th>車隊</th><th class="r">人數</th><th class="r">平均進度</th><th style="width:30%">氮氣</th></tr></thead><tbody id="teamTbl"></tbody></table>
+    </section>
+
+    <section class="card">
+      <h2>即時排名（前 20）</h2>
+      <table><thead><tr><th>#</th><th>名字</th><th>車隊</th><th class="r">進度</th><th class="r">Perfect</th></tr></thead><tbody id="rank"></tbody></table>
+    </section>
+
+    <section class="card">
+      <h2>賽事設定</h2>
+      <div class="form">
+        <label>每圈長度（公尺）</label><input id="cLap" type="number" min="300" max="4000" step="50">
+        <label>第一名衝線後倒數（秒）</label><input id="cGrace" type="number" min="5" max="120">
+        <label>最長比賽時間（秒）</label><input id="cMax" type="number" min="30" max="600">
+        <label>綠區寬度 %（第 1/2/3 圈）</label><div class="trio"><input id="cZ0" type="number" min="5" max="60"><input id="cZ1" type="number" min="5" max="60"><input id="cZ2" type="number" min="5" max="60"></div>
+        <label>彎道數（第 1/2/3 圈）</label><div class="trio"><input id="cC0" type="number" min="0" max="8"><input id="cC1" type="number" min="0" max="8"><input id="cC2" type="number" min="0" max="8"></div>
+        <label>氮氣：平均每人幾次 Perfect 集滿</label><input id="cNp" type="number" min="1" max="20">
+        <label>氮氣加速秒數</label><input id="cNs" type="number" min="1" max="10">
+        <div class="chk">
+          <label><input type="checkbox" id="mShift"> ⚙️ 換檔（關掉＝自動換檔、純連點）</label>
+          <label><input type="checkbox" id="mCurve"> ⚠️ 彎道</label>
+          <label><input type="checkbox" id="mNitro"> 🔥 車隊氮氣</label>
+          <label><input type="checkbox" id="mStart"> 🔴 起步反應（搶跑罰秒）</label>
+          <label><input type="checkbox" id="cPrac"> 🎮 開放試玩</label>
+        </div>
+        <label>路邊看板文字</label><input id="cBrand" maxlength="24">
+        <label>看板 Logo 圖檔（選填）</label><input id="cLogo" placeholder="例：logo.png">
+      </div>
+      <div class="hint" id="estHint"></div>
+    </section>
+
+    <section class="card">
+      <h2>車隊設定</h2>
+      <div class="form" style="margin-bottom:10px">
+        <label>桌號清單</label><input id="cTables" placeholder="1-30,VIP,主桌">
+      </div>
+      <div class="teamRow" style="color:var(--mut);font-size:12px"><span>隊名</span><span>顏色</span><span>對應桌號</span><span></span></div>
+      <div id="teamRows"></div>
+      <button class="ghost sm" id="addTeam">＋ 新增車隊</button>
+      <div class="hint">桌號寫法：<code>1-10</code> 或 <code>1,3,5,VIP</code>。沒對應到任何車隊的桌號，系統會依序輪流分配。</div>
+    </section>
+
+    <section class="card">
+      <h2>登入與分隊方式</h2>
+      <div class="form">
+        <label>登入方式</label>
+        <select id="cLogin"><option value="name">姓名＋桌號</option><option value="emp">員工編號（需匯入名單）</option></select>
+        <label>分隊方式</label>
+        <select id="cTeamMode"><option value="table">依桌號</option><option value="choose">玩家自選</option><option value="auto">系統自動平均</option><option value="list">依匯入名單</option></select>
+        <label>自選時每隊人數上限（0＝不限）</label><input id="cCap" type="number" min="0" max="1000">
+      </div>
+      <div class="hint">「員工編號」與「依匯入名單」要先在下方匯入名單。</div>
+    </section>
+
+    <section class="card">
+      <h2>名單匯入（員工編號登入用）</h2>
+      <textarea id="roster" placeholder="每行一筆：員工編號,姓名,車隊(隊名或第幾隊),桌號&#10;A001,王小明,紅隊,5&#10;A002,陳大文,2,12"></textarea>
+      <div class="row" style="margin-top:8px"><button class="cyan sm" id="bRoster">匯入（覆蓋舊名單）</button><span class="hint" id="rosterHint" style="margin:0"></span></div>
+    </section>
+
+    <section class="card">
+      <h2>測試車隊</h2>
+      <div class="row"><input id="botN" type="number" value="30" min="1" max="300"> 台
+        <button id="bBot" class="ghost">加入測試車</button><button id="bBotStop" class="ghost" disabled>停止</button></div>
+      <div class="hint">測試車名字前綴「測試_」，由這個後台分頁模擬駕駛（隨機分到各隊）。開新一局會一併清掉。<br>正式活動前記得開新一局清空。</div>
+    </section>
+
+    <section class="card links">
+      <h2>頁面連結</h2>
+      <a id="lPlayer" target="_blank"></a>
+      <a id="lTv" target="_blank"></a>
+      <div class="hint" id="localHint"></div>
+    </section>
+  </main>
+  <div class="saveBar"><button id="bSave">💾 儲存所有設定</button><span id="saveHint">等待開賽時才能修改設定</span></div>
+</div>
+
+<script src="core.js"></script>
+<script>
+(async function () {
+  /* ⚠ 密碼要跟 database.rules.json 裡的密碼一致 */
+  const ADMIN_PW = 'kuya2026';
+
+  const $ = id => document.getElementById(id);
+  function login() {
+    if ($('pw').value !== ADMIN_PW) { $('loginErr').textContent = '密碼錯誤'; return; }
+    try { sessionStorage.setItem('fs_admin', '1'); } catch (e) { }
+    start();
+  }
+  $('loginBtn').onclick = login;
+  $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+  let ok = false; try { ok = sessionStorage.getItem('fs_admin') === '1'; } catch (e) { }
+  if (ok) start();
+
+  let started = false;
+  async function start() {
+    if (started) return; started = true;
+    $('login').hidden = true; $('app').hidden = false;
+    const db = await GS.ready();
+    const P = s => GS.ROOT + '/' + s;
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    $('modeTag').textContent = GS.LOCAL_MODE ? '本機測試模式' : 'Firebase 正式模式';
+    $('modeTag').classList.toggle('local', GS.LOCAL_MODE);
+    const base = location.href.replace(/[?#].*$/, '').replace(/[^/]*$/, ''), qs = GS.LOCAL_MODE && /local=1/.test(location.search) ? '?local=1' : '';
+    $('lPlayer').href = base + 'index.html' + qs; $('lPlayer').textContent = '📱 玩家端：' + base + 'index.html' + qs;
+    $('lTv').href = base + 'tv.html' + qs; $('lTv').textContent = '🖥 投影端：' + base + 'tv.html' + qs;
+    if (GS.LOCAL_MODE) $('localHint').innerHTML = '本機測試：同一個瀏覽器開多個分頁就會互通。<br>想開第二位玩家：在玩家網址後加 <b>slot=2</b>（例如 index.html?local=1&slot=2）';
+
+    /* 管理寫入：開鎖 → 寫入 → 上鎖（排隊執行，避免互相關鎖） */
+    let q = Promise.resolve();
+    function aw(fn) {
+      const run = q.then(async () => {
+        await db.set(P('lock'), { open: true, pw: ADMIN_PW });
+        try { await fn(); } finally { await db.set(P('lock'), { open: false, pw: ADMIN_PW }); }
+      });
+      q = run.catch(e => console.error(e));
+      return run;
+    }
+
+    let game = null, cfg = GS.cfgOf(null), tr = GS.track(cfg), round = 1, fin = null, joined = 0, top = [], players = {};
+    const subs = {};
+    function resub(k, fn) { if (subs[k]) subs[k](); subs[k] = fn(); }
+
+    db.onConnected(c => $('conn').classList.toggle('off', !c));
+    let inited = false;
+    db.on(P('game'), g => {
+      if (!g && !inited) { inited = true; aw(() => db.set(P('game'), { round: 1, status: 'lobby', cfg: GS.DEFAULT_CFG })); return; }
+      inited = true;
+      game = g || {}; cfg = GS.cfgOf(game); tr = GS.track(cfg);
+      const r = game.round || 1;
+      if (r !== round || !subs.fin) {
+        round = r; computing = false; tsMem = {}; lrMem = {};
+        resub('fin', () => db.on(P('finish/' + r), v => { fin = v; }));
+        resub('cnt', () => db.on(P('counts/' + r), v => { joined = v || 0; }));
+        resub('ts', () => db.on(P('tstat/' + r), v => { tsLive = v || {}; if (!Object.keys(tsMem).length && v) GS.toArr(v).forEach((x, i) => { if (x) tsMem[i] = { used: x.used || 0, nu: x.nu || 0, nc: x.nc || 0 }; }); renderTeams(); }));
+      }
+      if (!formDirty) fillForm();
+      render();
+    });
+    resub('players', () => db.on(P('players'), v => { players = v || {}; }));
+    db.onTop(P('players'), 's', 20, a => { top = a; renderRank(); });
+    let tsLive = {};
+
+    /* ───── 狀態顯示 ───── */
+    function phaseOf(now) {
+      if (!game) return '';
+      const s = game.status || 'lobby';
+      if (s === 'lobby' || s === 'grid' || s === 'ended') return s;
+      if (now < (game.startAt || 0)) return 'countdown';
+      if (now >= GS.endAt(game, fin)) return 'closing';
+      return fin && fin.firstAt ? 'grace' : 'racing';
+    }
+    const LABEL = { lobby: '等待中（可試玩）', grid: '發車區待命', countdown: '紅燈倒數中', racing: '比賽中', grace: '最後倒數', closing: '計算名次中', ended: '已結束' };
+    function render() {
+      const now = db.now(), ph = phaseOf(now);
+      $('sRound').textContent = round;
+      const show = game && game.show;
+      $('sStatus').textContent = (LABEL[ph] || '-') + (show === 'podium' ? '（頒獎台）' : show === 'teams' ? '（車隊排名）' : '');
+      $('sJoined').textContent = joined;
+      $('sFin').textContent = fin && fin.count || 0;
+      const e = GS.endAt(game, fin);
+      $('sLeft').textContent = (ph === 'racing' || ph === 'grace' || ph === 'countdown') && isFinite(e) ? Math.max(0, Math.ceil((e - now) / 1000)) : '-';
+      $('bGrid').disabled = ph !== 'lobby';
+      $('bStart').disabled = !(ph === 'lobby' || ph === 'grid');
+      $('bForce').disabled = !(ph === 'racing' || ph === 'grace' || ph === 'countdown');
+      $('bPodium').disabled = ph !== 'ended'; $('bTeams').disabled = ph !== 'ended';
+      $('bPodium').textContent = show === 'podium' ? '🏆 收起頒獎台' : '🏆 揭曉頒獎台';
+      $('bTeams').textContent = show === 'teams' ? '🚩 收起車隊排名' : '🚩 公布車隊排名';
+      const lock = !(ph === 'lobby');
+      document.querySelectorAll('main input, main select, main textarea, #bSave, #addTeam, #bRoster, .teamRow button').forEach(el => {
+        if (el.id === 'botN') return; el.disabled = lock;
+      });
+      $('saveHint').textContent = lock ? '比賽進行中，設定已鎖定' : (formDirty ? '⚠ 有尚未儲存的修改' : '設定只在「等待中」可以修改');
+    }
+    const pctOf = p => p.f ? 100 : Math.min(99, Math.floor((p.d || 0) / tr.total * 100));
+    function renderRank() {
+      $('rank').innerHTML = top.map((p, i) => {
+        const t = GS.team(cfg, p.tm);
+        return `<tr><td>${i + 1}</td><td>${esc(p.n)}</td><td><span class="sw" style="background:${t.c}"></span>${esc(t.n)}</td><td class="r">${p.f ? '🏁 第' + p.f + '位' : pctOf(p) + '%'}</td><td class="r">${p.pc || 0}</td></tr>`;
+      }).join('') || '<tr><td colspan="5" style="color:#9a9fbb">尚無玩家</td></tr>';
+    }
+    function renderTeams() {
+      const now = db.now();
+      $('teamTbl').innerHTML = cfg.teams.map((t, i) => {
+        const s = tsLive && tsLive[i] || {};
+        const on = now < (s.nu || 0);
+        return `<tr><td><span class="sw" style="background:${t.c}"></span>${esc(t.n)}</td><td class="r">${s.n || 0}</td><td class="r">${Math.round((s.a || 0) / tr.total * 100)}%</td>
+          <td>${on ? '🔥 加速中' : `<div class="bar"><i style="width:${Math.round(Math.min(1, s.g || 0) * 100)}%"></i></div>`}<span style="font-size:11px;color:#9a9fbb">已觸發 ${s.nc || 0} 次</span></td></tr>`;
+      }).join('');
+    }
+
+    /* ───── 設定 ───── */
+    let formDirty = false;
+    document.querySelector('main').addEventListener('input', e => { if (e.target.closest('#roster') || e.target.id === 'botN') return; formDirty = true; render(); });
+    let teamsEdit = [];
+    function teamRowsHTML() {
+      $('teamRows').innerHTML = teamsEdit.map((t, i) => `<div class="teamRow">
+        <input data-k="n" data-i="${i}" value="${esc(t.n)}" maxlength="8"><input type="color" data-k="c" data-i="${i}" value="${t.c}">
+        <input data-k="tb" data-i="${i}" value="${esc(t.tb)}" placeholder="例：1-10"><button class="ghost sm" data-del="${i}" title="刪除">✕</button></div>`).join('');
+    }
+    $('teamRows').addEventListener('input', e => { const el = e.target; if (el.dataset.k) teamsEdit[+el.dataset.i][el.dataset.k] = el.value; });
+    $('teamRows').addEventListener('click', e => {
+      const b = e.target.closest('[data-del]'); if (!b || teamsEdit.length <= 2) return;
+      teamsEdit.splice(+b.dataset.del, 1); formDirty = true; teamRowsHTML(); render();
+    });
+    $('addTeam').onclick = () => {
+      if (teamsEdit.length >= 12) return;
+      const cols = ['#ff2d55', '#1e9bff', '#ffc21a', '#2dd47a', '#b44dff', '#ff7a1a', '#19e3ff', '#ff5ec8', '#8ae600', '#ffffff', '#a0522d', '#7a7aff'];
+      teamsEdit.push({ n: '車隊' + (teamsEdit.length + 1), c: cols[teamsEdit.length % cols.length], tb: '' }); formDirty = true; teamRowsHTML(); render();
+    };
+    function fillForm() {
+      $('cLap').value = cfg.lapLen; $('cGrace').value = cfg.grace; $('cMax').value = cfg.maxTime;
+      [0, 1, 2].forEach(i => { $('cZ' + i).value = cfg.zone[i]; $('cC' + i).value = cfg.curves[i]; });
+      $('cNp').value = cfg.nitroPer; $('cNs').value = cfg.nitroSec;
+      $('mShift').checked = cfg.mech.shift; $('mCurve').checked = cfg.mech.curve; $('mNitro').checked = cfg.mech.nitro; $('mStart').checked = cfg.mech.start;
+      $('cPrac').checked = cfg.practice; $('cBrand').value = cfg.brand; $('cLogo').value = cfg.logo;
+      $('cTables').value = cfg.tables; $('cLogin').value = cfg.loginMode; $('cTeamMode').value = cfg.teamMode; $('cCap').value = cfg.teamCap;
+      teamsEdit = cfg.teams.map(t => Object.assign({}, t)); teamRowsHTML(); est();
+    }
+    function readForm() {
+      const n = (id, a, b, d) => { let v = parseFloat($(id).value); return isNaN(v) ? d : Math.max(a, Math.min(b, v)); };
+      return {
+        lapLen: Math.round(n('cLap', 300, 4000, 1000)), grace: Math.round(n('cGrace', 5, 120, 20)), maxTime: Math.round(n('cMax', 30, 600, 180)),
+        zone: [0, 1, 2].map(i => Math.round(n('cZ' + i, 5, 60, GS.DEFAULT_CFG.zone[i]))),
+        curves: [0, 1, 2].map(i => Math.round(n('cC' + i, 0, 8, GS.DEFAULT_CFG.curves[i]))),
+        nitroPer: Math.round(n('cNp', 1, 20, 3)), nitroSec: Math.round(n('cNs', 1, 10, 3)),
+        mech: { shift: $('mShift').checked, curve: $('mCurve').checked, nitro: $('mNitro').checked, start: $('mStart').checked },
+        practice: $('cPrac').checked, brand: $('cBrand').value.trim().slice(0, 24) || 'FULL SPRINT', logo: $('cLogo').value.trim(),
+        tables: $('cTables').value.trim() || '1-30', loginMode: $('cLogin').value, teamMode: $('cTeamMode').value, teamCap: Math.round(n('cCap', 0, 1000, 0)),
+        teams: teamsEdit.map((t, i) => ({ n: (t.n || '車隊' + (i + 1)).trim().slice(0, 8), c: t.c || '#888888', tb: (t.tb || '').trim() }))
+      };
+    }
+    function est() {
+      const L = +$('cLap').value || 1000, cs = [0, 1, 2].map(i => +$('cC' + i).value || 0);
+      const laps = cs.map(c => L / 46 + c * 2.2 + 3), tot = laps.reduce((a, b) => a + b, 0);
+      $('estHint').innerHTML = `預估（一般玩家）：每圈約 ${laps.map(x => Math.round(x)).join(' / ')} 秒，全程約 <b>${Math.round(tot)}</b> 秒；高手會快 15–25%。`;
+    }
+    ['cLap', 'cC0', 'cC1', 'cC2'].forEach(id => $(id).addEventListener('input', est));
+    async function saveCfg() { const c = readForm(); await aw(() => db.update(P('game'), { cfg: c })); formDirty = false; render(); }
+    $('bSave').onclick = async () => { await saveCfg(); $('saveHint').textContent = '✅ 設定已儲存'; };
+
+    /* ───── 名單匯入 ───── */
+    async function refreshRosterCount() { let n = 0; try { n = await db.get(P('rosterN')) || 0; } catch (e) { } $('rosterHint').textContent = n ? `目前名單 ${n} 筆` : '目前沒有名單'; }
+    refreshRosterCount();
+    $('bRoster').onclick = async () => {
+      const out = {}; let bad = 0;
+      $('roster').value.split(/\r?\n/).forEach(line => {
+        const c = line.split(/[,\t，]/).map(s => s.trim()); if (!c[0]) return;
+        const k = GS.cleanKey(c[0]); if (!k || !c[1]) { bad++; return; }
+        let tm = null;
+        if (c[2]) { const i = cfg.teams.findIndex(t => t.n === c[2]); tm = i >= 0 ? i : (/^\d+$/.test(c[2]) ? Math.max(0, +c[2] - 1) : null); }
+        out[k] = { n: GS.cleanName(c[1]) }; if (tm != null) out[k].tm = tm; if (c[3]) out[k].tb = c[3].slice(0, 10);
+      });
+      if (!Object.keys(out).length) { $('rosterHint').textContent = '沒有可匯入的資料'; return; }
+      if (!confirm(`匯入 ${Object.keys(out).length} 筆名單（舊名單會被覆蓋）？`)) return;
+      await aw(async () => { await db.set(P('roster'), out); await db.set(P('rosterN'), Object.keys(out).length); });
+      $('rosterHint').textContent = `✅ 已匯入 ${Object.keys(out).length} 筆` + (bad ? `，${bad} 筆格式不對略過` : '');
+    };
+
+    /* ───── 控制按鈕 ───── */
+    $('bGrid').onclick = async () => { if (formDirty) await saveCfg(); await aw(() => db.update(P('game'), { status: 'grid', show: '' })); };
+    $('bStart').onclick = async () => {
+      if (formDirty) await saveCfg();
+      const now = Math.round(db.now()), lightsAt = now + 1500;
+      const startAt = lightsAt + GS.LIGHTS * GS.LIGHT_MS + Math.round(400 + Math.random() * 1000);
+      await aw(() => db.update(P('game'), { status: 'racing', lightsAt, startAt, forceEndAt: null, show: '' }));
+    };
+    $('bForce').onclick = async () => {
+      if (!confirm('確定要立刻結束比賽？')) return;
+      await aw(() => db.update(P('game'), { forceEndAt: Math.round(db.now()) }));
+    };
+    $('bPodium').onclick = () => aw(() => db.update(P('game'), { show: game && game.show === 'podium' ? '' : 'podium' }));
+    $('bTeams').onclick = () => aw(() => db.update(P('game'), { show: game && game.show === 'teams' ? '' : 'teams' }));
+    $('bNew').onclick = async () => {
+      if (!confirm('確定開新一局？本局玩家資料會清空（玩家手機會自動回到等待畫面，名字保留）')) return;
+      stopBots();
+      await aw(() => db.update(GS.ROOT, {
+        players: null, finish: null, counts: null, tcount: null, tstat: null, lrank: null, results: null,
+        'game/round': round + 1, 'game/status': 'lobby', 'game/startAt': null, 'game/lightsAt': null, 'game/forceEndAt': null, 'game/show': ''
+      }));
+    };
+
+    /* ───── 每 2 秒：車隊平均、氮氣、即時名次 ───── */
+    let tsMem = {}, lrMem = {}, ticking = false;
+    function teamCalc() {
+      const now = db.now(), stat = cfg.teams.map(() => ({ n: 0, sd: 0, pc: 0 }));
+      const arr = [];
+      for (const [k, p] of Object.entries(players || {})) {
+        if (!p || typeof p.s !== 'number') continue;
+        const i = +p.tm; if (!stat[i]) continue;
+        const d = p.f ? tr.total : Math.min(tr.total, p.d || 0);
+        stat[i].n++; stat[i].sd += d; stat[i].pc += p.pc || 0;
+        arr.push({ k, s: p.s });
+      }
+      const ts = {};
+      stat.forEach((s, i) => {
+        const m = tsMem[i] = tsMem[i] || { used: 0, nu: 0, nc: 0 };
+        const need = Math.max(1, s.n) * cfg.nitroPer;
+        let g = (s.pc - m.used) / need;
+        if (cfg.mech.nitro && game.status === 'racing' && g >= 1 && now >= m.nu && now >= (game.startAt || 0)) {
+          m.nu = Math.round(now + cfg.nitroSec * 1000); m.used += need; m.nc++; g = (s.pc - m.used) / need;
+        }
+        ts[i] = { n: s.n, a: s.n ? Math.round(s.sd / s.n) : 0, g: Math.round(Math.max(0, Math.min(1, g)) * 100) / 100, nu: m.nu, nc: m.nc, used: m.used };
+      });
+      arr.sort((a, b) => b.s - a.s);
+      const lr = {}; let changed = 0;
+      arr.forEach((x, i) => { if (lrMem[x.k] !== i + 1) { lr[x.k] = i + 1; lrMem[x.k] = i + 1; changed++; } });
+      return { ts, lr: changed ? lr : null };
+    }
+    async function tick() {
+      if (ticking || !game) return;
+      const st = game.status;
+      if (st !== 'racing' && st !== 'grid') return;
+      ticking = true;
+      try {
+        const { ts, lr } = teamCalc();
+        await aw(async () => {
+          await db.set(P('tstat/' + round), ts);
+          if (lr && st === 'racing') await db.update(P('lrank/' + round), lr);
+        });
+      } catch (e) { console.error(e); }
+      ticking = false;
+    }
+    setInterval(tick, 2000);
+
+    /* ───── 時間到：結算 ───── */
+    let computing = false;
+    async function settle() {
+      if (computing) return; computing = true;
+      const r = round;
+      try {
+        const all = await db.get(P('players')) || {};
+        const arr = Object.entries(all).filter(([, v]) => v && typeof v.s === 'number').map(([k, v]) => ({ k, s: v.s, v }));
+        arr.sort((a, b) => b.s - a.s);
+        const ranks = {}; arr.forEach((x, i) => ranks[x.k] = i + 1);
+        const st = cfg.teams.map((t, i) => ({ i, n: 0, sd: 0 }));
+        arr.forEach(x => { const s = st[+x.v.tm]; if (!s) return; s.n++; s.sd += x.v.f ? tr.total : Math.min(tr.total, x.v.d || 0); });
+        const teams = st.map(s => ({ i: s.i, n: s.n, a: s.n ? Math.round(s.sd / s.n) : 0 })).sort((a, b) => b.a - a.a);
+        await aw(() => db.update(GS.ROOT, { ['results/' + r + '/ranks']: ranks, ['results/' + r + '/total']: arr.length, ['results/' + r + '/teams']: teams, 'game/status': 'ended', 'game/show': '' }));
+      } catch (e) { console.error(e); computing = false; }
+    }
+    setInterval(() => {
+      render(); renderTeams();
+      if (game && game.status === 'racing' && db.now() >= GS.endAt(game, fin) + 2500) settle();
+    }, 400);
+
+    /* ───── 測試車隊 ───── */
+    let bots = [], botTimer = null;
+    $('bBot').onclick = async () => {
+      const n = Math.max(1, Math.min(300, parseInt($('botN').value, 10) || 30));
+      const startI = bots.length, add = {}, tl = GS.tableList(cfg), tAdd = {};
+      for (let i = 0; i < n; i++) {
+        const k = 'bot_' + round + '_' + (startI + i);
+        const tb = tl[Math.floor(Math.random() * tl.length)] || '1';
+        const tm = cfg.teamMode === 'table' ? GS.teamOfTable(cfg, tb) : (startI + i) % cfg.teams.length;
+        const b = { k, n: '測試_' + (startI + i + 1), tb, tm, d: 0, f: 0, v: 0, pc: 0, skill: 0.75 + Math.random() * 0.35, pause: 0, e: '', ec: 0 };
+        bots.push(b); add[k] = { n: b.n, tb, tm, d: 0, v: 0, s: 0, f: 0, pc: 0, e: '', ec: 0, t: Math.round(db.now()) };
+        tAdd[tm] = (tAdd[tm] || 0) + 1;
+      }
+      await db.update(P('players'), add);
+      await db.txn(P('counts/' + round), c => (c || 0) + n);
+      for (const tm in tAdd) await db.txn(P('tcount/' + round + '/' + tm), c => (c || 0) + tAdd[tm]);
+      $('bBotStop').disabled = false;
+      if (!botTimer) botTimer = setInterval(botTick, 1500);
+    };
+    $('bBotStop').onclick = stopBots;
+    function stopBots() { clearInterval(botTimer); botTimer = null; bots = []; $('bBotStop').disabled = true; }
+    async function botTick() {
+      if (!game || game.status !== 'racing') return;
+      const now = db.now();
+      if (now < (game.startAt || 0) || now >= GS.endAt(game, fin)) return;
+      const up = {};
+      for (const b of bots) {
+        if (b.f) continue;
+        const inCurve = tr.curves.some(c => b.d >= c.s && b.d <= c.s + c.len);
+        let v = 52 * b.skill * (0.85 + Math.random() * 0.3);
+        if (inCurve) v = 30;
+        if (now < (tsLive[b.tm] && tsLive[b.tm].nu || 0)) v *= 1.35;
+        if (b.pause > now) v = 4;
+        else if (Math.random() < 0.06) { b.pause = now + 1500; b.e = Math.random() < 0.5 ? 'st' : 'sl'; b.ec++; }
+        else if (Math.random() < 0.3 * b.skill) { b.pc++; b.e = 'pf'; b.ec++; }
+        const elapsed = Math.min(1.5, (now - (game.startAt || now)) / 1000);
+        b.v = v; b.d = Math.min(tr.total, b.d + v * elapsed);
+        if (b.d >= tr.total && !b.f) {
+          const r = await db.txn(P('finish/' + round), c => { c = c || {}; c.count = (c.count || 0) + 1; if (!c.firstAt) c.firstAt = Math.round(db.now()); return c; });
+          if (r.committed && r.val) b.f = r.val.count;
+        }
+        const d = Math.floor(b.d);
+        up[b.k] = { n: b.n, tb: b.tb, tm: b.tm, d, v: Math.round(v * 10), s: GS.score(d, b.f), f: b.f, pc: b.pc, e: b.e, ec: b.ec, t: Math.round(now) };
+      }
+      if (Object.keys(up).length) await db.update(P('players'), up);
+    }
+  }
+})();
+</script>
+</body>
+</html>

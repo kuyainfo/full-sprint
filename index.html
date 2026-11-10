@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#07060f">
+<title>全速衝刺</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--red:#ff2d55;--cyan:#19e3ff;--yel:#ffd60a;--grn:#2dff8a;--bg:#07060f;--card:rgba(12,12,24,.86);--line:rgba(255,255,255,.12);--tm:#ff2d55;
+  --safeB:env(safe-area-inset-bottom,0px);--safeT:env(safe-area-inset-top,0px);--orb:'Orbitron','Noto Sans TC',sans-serif}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{background:var(--bg);color:#fff;font-family:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+#app{position:relative;width:100%;height:100vh;height:100dvh;overflow:hidden;background:var(--bg);margin:0 auto}
+@media (min-width:600px){
+  body{background:radial-gradient(ellipse at 50% 30%,#2a0f3a,#05040b 70%);display:flex;align-items:center;justify-content:center}
+  #app{width:410px;height:min(calc(100vh - 40px),860px);border-radius:34px;border:1px solid rgba(255,45,85,.35);
+    box-shadow:0 30px 80px rgba(0,0,0,.7),0 0 0 10px #0c0a16,0 0 0 11px rgba(25,227,255,.2)}
+}
+.screen{position:absolute;inset:0;display:none;flex-direction:column}
+.screen.on{display:flex}
+canvas.bg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.orb{font-family:var(--orb)}
+
+/* ───── 標題 ───── */
+.logo{position:relative;margin-top:calc(9vh + var(--safeT));text-align:center;z-index:2}
+.logo .en{font-family:var(--orb);font-weight:900;font-style:italic;letter-spacing:.35em;font-size:12px;color:var(--cyan);text-shadow:0 0 12px rgba(25,227,255,.7)}
+.logo h1{font-size:54px;font-weight:900;font-style:italic;letter-spacing:.06em;line-height:1.1;margin-top:6px;
+  background:linear-gradient(180deg,#fff 0%,#ffd1dc 45%,#ff2d55 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 3px 0 #5a0018) drop-shadow(0 0 18px rgba(255,45,85,.55))}
+.logo .stripe{width:170px;height:10px;margin:10px auto 0;background:repeating-linear-gradient(90deg,#fff 0 10px,#111 10px 20px);
+  transform:skewX(-20deg);box-shadow:0 0 0 2px #111}
+
+/* ───── 卡片 ───── */
+.card{position:absolute;left:16px;right:16px;bottom:calc(22px + var(--safeB));background:var(--card);
+  border:1px solid var(--line);border-radius:20px;padding:18px 18px 20px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  box-shadow:0 14px 40px rgba(0,0,0,.6);z-index:2}
+.card::before{content:'';position:absolute;left:18px;right:18px;top:-1px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--red),var(--cyan))}
+.lbl{font-size:13px;color:#aab0c8;margin:10px 0 6px;letter-spacing:.1em}
+.lbl:first-child{margin-top:0}
+input,select{width:100%;font:inherit;font-size:19px;font-weight:700;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.05);color:#fff;outline:none;user-select:text;-webkit-user-select:text;appearance:none;-webkit-appearance:none}
+select{background-image:linear-gradient(45deg,transparent 50%,#fff 50%),linear-gradient(135deg,#fff 50%,transparent 50%);
+  background-position:calc(100% - 20px) 55%,calc(100% - 14px) 55%;background-size:6px 6px;background-repeat:no-repeat}
+select option{color:#000}
+input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(25,227,255,.18)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:block;width:100%;margin-top:16px;font:inherit;font-size:20px;font-weight:900;letter-spacing:.3em;padding:14px 0 14px .3em;
+  border:none;border-radius:14px;color:#fff;cursor:pointer;font-style:italic;
+  background:linear-gradient(180deg,#ff5a7a 0%,#ff2d55 50%,#c3002f 100%);box-shadow:0 4px 0 #6e0019,0 10px 24px rgba(255,45,85,.35)}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #6e0019}
+.btn.ghost{background:rgba(255,255,255,.06);box-shadow:none;border:1px solid rgba(255,255,255,.2);font-size:16px;letter-spacing:.15em}
+.btn.cyan{background:linear-gradient(180deg,#6ff0ff 0%,#19c3e6 50%,#0a7d9a 100%);box-shadow:0 4px 0 #064a5c,0 10px 24px rgba(25,227,255,.3);color:#04121a}
+.err{color:#ff8fa5;font-size:13px;min-height:18px;margin-top:8px;text-align:center}
+.teamBadge{display:inline-flex;align-items:center;gap:8px;font-weight:900;font-size:15px;padding:5px 14px 5px 8px;border-radius:30px;
+  background:rgba(0,0,0,.4);border:2px solid var(--tm);color:#fff}
+.teamBadge i{width:14px;height:14px;border-radius:50%;background:var(--tm);box-shadow:0 0 10px var(--tm)}
+.center{text-align:center}
+.who{font-size:26px;font-weight:900;margin:10px 0 6px}
+.wait{color:var(--yel);font-weight:700;letter-spacing:.1em;margin-top:6px}
+.dots::after{content:'';animation:dots 1.6s steps(4) infinite}
+@keyframes dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+.count{font-size:13px;color:#aab0c8;margin-top:4px}
+.count b{font-family:var(--orb);color:#fff}
+.tips{display:grid;gap:7px;margin:14px 0 2px;text-align:left}
+.tips div{display:flex;gap:10px;align-items:center;font-size:14px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;padding:7px 10px}
+.tips b{flex:none;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;background:#1b1d2b}
+
+/* ───── 比賽畫面 ───── */
+#sRace{background:#000}
+.hud{position:relative;z-index:3;padding:calc(8px + var(--safeT)) 12px 8px;background:linear-gradient(180deg,#0a0912,#0a0912 80%,rgba(10,9,18,.9))}
+.hudTop{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hudTop .teamBadge{font-size:13px;padding:3px 10px 3px 6px;max-width:44%;overflow:hidden;white-space:nowrap}
+.hudTop .teamBadge span{overflow:hidden;text-overflow:ellipsis}
+.lap{font-family:var(--orb);font-weight:900;font-style:italic;font-size:15px;color:var(--cyan)}
+.lap b{font-size:22px;color:#fff}
+.rank{font-family:var(--orb);font-weight:900;font-style:italic;text-align:right;line-height:1}
+.rank b{font-size:24px;color:var(--yel)}
+.rank small{font-size:12px;color:#8890aa}
+.nitro{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:11px;color:#aab0c8;font-weight:700;letter-spacing:.08em}
+.nitro .bar{flex:1;height:9px;border-radius:9px;background:#1b1d2b;overflow:hidden;position:relative}
+.nitro .bar i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:9px;background:linear-gradient(90deg,#1e6bff,#19e3ff);transition:width .5s}
+.nitro.full .bar i{background:linear-gradient(90deg,#fff,#19e3ff,#1e6bff);animation:pulse .3s infinite alternate}
+.nitro.off{display:none}
+@keyframes pulse{to{filter:brightness(1.6)}}
+.pracTag{display:none;font-size:12px;font-weight:900;color:#04121a;background:var(--cyan);border-radius:20px;padding:3px 10px;letter-spacing:.1em}
+.prac .pracTag{display:inline-block}
+.prac .rank,.prac .nitro{display:none}
+.exitP{display:none;font:inherit;font-size:12px;color:#fff;background:rgba(255,255,255,.1);border:1px solid var(--line);border-radius:20px;padding:4px 10px}
+.prac .exitP{display:inline-block}
+.roadWrap{position:relative;flex:1;min-height:0;overflow:hidden}
+#road{position:absolute;inset:0;width:100%;height:100%;display:block}
+.tachoWrap{position:relative;height:26%;min-height:170px;background:linear-gradient(180deg,#0a0912,#05050a)}
+#tacho{position:absolute;inset:0;width:100%;height:100%}
+.ctrl{display:grid;grid-template-columns:38% 1fr;gap:10px;padding:10px 12px calc(12px + var(--safeB));height:20%;min-height:120px;background:#05050a}
+.ctrl.noshift{grid-template-columns:1fr}
+.ctrl.noshift #bShift{display:none}
+.pad{position:relative;border:none;border-radius:20px;font:inherit;color:#fff;font-weight:900;cursor:pointer;touch-action:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;overflow:hidden}
+.pad .big{font-size:26px;font-style:italic;letter-spacing:.12em}
+.pad .sm{font-family:var(--orb);font-size:11px;letter-spacing:.3em;opacity:.8}
+#bShift{background:linear-gradient(180deg,#2c5bff,#1435b8);box-shadow:inset 0 2px 0 rgba(255,255,255,.25),0 5px 0 #0b1d66}
+#bShift.zone{background:linear-gradient(180deg,#48ffad,#10b864);box-shadow:inset 0 2px 0 rgba(255,255,255,.35),0 5px 0 #06572e,0 0 30px rgba(45,255,138,.6);color:#032012}
+#bGas{background:repeating-linear-gradient(-20deg,rgba(255,255,255,.07) 0 8px,transparent 8px 20px),linear-gradient(180deg,#ff5a7a,#d4002f);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.25),0 5px 0 #6e0019}
+.pad.hold{transform:translateY(4px);box-shadow:none!important;filter:brightness(1.3)}
+.pad.hit{transform:translateY(4px);box-shadow:none!important;filter:brightness(1.25)}
+.pad.dis{filter:grayscale(.8) brightness(.55)}
+
+.ov{position:absolute;left:0;right:0;z-index:4;pointer-events:none;text-align:center}
+.warn{top:10px;display:none;margin:0 auto;width:86%;left:7%;right:auto;padding:8px 0;border-radius:12px;font-weight:900;font-size:22px;letter-spacing:.08em;
+  color:#111;background:repeating-linear-gradient(-45deg,#ffd60a 0 14px,#111 14px 22px);box-shadow:0 0 0 3px #111,0 0 24px rgba(255,214,10,.6)}
+.warn span{background:#ffd60a;padding:2px 12px;border-radius:8px}
+.warn.on{display:block;animation:shake .25s infinite alternate}
+.warn.act{background:repeating-linear-gradient(-45deg,#ff2d55 0 14px,#111 14px 22px)}
+.warn.act span{background:#ff2d55;color:#fff}
+@keyframes shake{to{transform:translateX(3px)}}
+.toast{top:40%;font-size:28px;font-weight:900;font-style:italic;letter-spacing:.06em;opacity:0;transform:scale(.6);transition:all .18s;text-shadow:0 3px 0 #000,0 0 16px rgba(0,0,0,.8)}
+.toast.on{opacity:1;transform:scale(1)}
+.toast.good{color:var(--grn)}.toast.bad{color:#ff5a7a}.toast.blue{color:var(--cyan)}.toast.gold{color:var(--yel)}
+.lights{top:16%;display:none}
+.lights.on{display:block}
+.lights .box{display:inline-flex;gap:8px;padding:10px 12px;background:#0b0b10;border-radius:14px;border:2px solid #222;box-shadow:0 10px 30px rgba(0,0,0,.6)}
+.lights i{width:34px;height:34px;border-radius:50%;background:#2a0b10;box-shadow:inset 0 3px 6px rgba(0,0,0,.6)}
+.lights i.on{background:radial-gradient(circle at 40% 35%,#ffb0b0,#ff1a1a 45%,#9a0000);box-shadow:0 0 18px #ff1a1a}
+.lights p{margin-top:10px;font-weight:900;font-size:17px;text-shadow:0 2px 6px #000}
+.coach{bottom:12px;display:none;margin:0 auto;left:5%;right:5%;padding:10px 14px;border-radius:14px;font-size:16px;font-weight:700;
+  background:rgba(25,227,255,.92);color:#04121a;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.coach.on{display:block}
+.coach b{color:#a8002a}
+.zb{top:64px;display:none}.zb.on{display:block}
+.zb span{display:inline-block;font-size:17px;font-weight:900;padding:5px 16px;border-radius:20px;background:#ff2d55;color:#fff;box-shadow:0 0 18px rgba(255,45,85,.7);animation:pulse .25s infinite alternate}
+.zb.y span{background:#ffd60a;color:#1a1400;box-shadow:0 0 18px rgba(255,214,10,.6)}
+.goBig{top:30%;font-family:var(--orb);font-weight:900;font-style:italic;font-size:80px;color:var(--grn);opacity:0;text-shadow:0 0 30px rgba(45,255,138,.8),0 5px 0 #000}
+.goBig.on{animation:go .9s forwards}
+@keyframes go{0%{opacity:0;transform:scale(2.2)}20%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(1.1)}}
+.fin{position:absolute;inset:0;z-index:6;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,.5),rgba(0,0,0,.88));pointer-events:auto}
+.fin.on{display:flex}
+.fin .flag{width:120px;height:80px;background:conic-gradient(#fff 0 25%,#111 0 50%,#fff 0 75%,#111 0) 0 0/24px 24px;border-radius:6px;transform:skewY(-6deg);box-shadow:0 0 30px rgba(255,255,255,.3)}
+.fin h2{font-family:var(--orb);font-style:italic;font-size:44px;margin-top:18px;color:var(--yel);text-shadow:0 0 20px rgba(255,214,10,.6)}
+.fin p{margin-top:8px;font-size:17px;line-height:1.6;padding:0 20px}
+.fin .btns{display:grid;gap:10px;width:78%;margin-top:14px}
+.fin .btns .btn{margin-top:0}
+.flash{position:absolute;inset:0;z-index:5;pointer-events:none;opacity:0;transition:opacity .15s}
+.flash.red{background:rgba(255,30,60,.35);opacity:1}
+.flash.blue{background:rgba(40,160,255,.25);opacity:1}
+
+/* ───── 結算 ───── */
+.res{position:relative;z-index:2;margin-top:calc(10vh + var(--safeT));text-align:center;padding:0 20px}
+.res .en{font-family:var(--orb);font-weight:900;letter-spacing:.35em;font-size:12px;color:var(--cyan)}
+.res .rk{font-family:var(--orb);font-weight:900;font-style:italic;font-size:110px;line-height:1;margin-top:8px;
+  background:linear-gradient(180deg,#fff,#ffd60a 60%,#ff8a00);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 0 #3a1a00)}
+.res .of{color:#aab0c8;font-size:15px;margin-top:4px}
+.res .tr{margin-top:22px;display:inline-block;padding:12px 20px;border-radius:16px;background:rgba(0,0,0,.5);border:2px solid var(--tm)}
+.res .tr b{font-family:var(--orb);font-size:30px;color:var(--yel)}
+.res .msg{margin-top:20px;color:var(--yel);font-weight:700;letter-spacing:.1em}
+.conn{position:absolute;top:calc(6px + var(--safeT));right:8px;z-index:20;font-size:11px;color:#fff;background:#c3002f;padding:2px 8px;border-radius:10px;display:none}
+.conn.on{display:block}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="conn" id="conn">連線中斷，重新連線中…</div>
+
+  <!-- 登入 -->
+  <section class="screen" id="sJoin">
+    <canvas class="bg" id="bg1"></canvas>
+    <div class="logo"><div class="en">FULL SPRINT</div><h1>全速衝刺</h1><div class="stripe"></div></div>
+    <div class="card">
+      <div id="fName"><div class="lbl">你的名字</div><input id="nameIn" maxlength="10" placeholder="輸入名字" autocomplete="off"></div>
+      <div id="fEmp" hidden><div class="lbl">員工編號</div><input id="empIn" maxlength="20" placeholder="輸入員工編號" autocomplete="off"></div>
+      <div id="fTable"><div class="lbl">桌號</div><select id="tbIn"></select></div>
+      <div id="fTeam" hidden><div class="lbl">選擇車隊</div><select id="tmIn"></select></div>
+      <button class="btn" id="joinBtn">進入車庫</button>
+      <div class="err" id="joinErr"></div>
+    </div>
+  </section>
+
+  <!-- 等待區 -->
+  <section class="screen" id="sLobby">
+    <canvas class="bg" id="bg2"></canvas>
+    <div class="logo"><div class="en">FULL SPRINT</div><h1>全速衝刺</h1><div class="stripe"></div></div>
+    <div class="card center">
+      <div class="teamBadge" id="lobTeam"><i></i><span></span></div>
+      <div class="who" id="lobName"></div>
+      <div class="tips">
+        <div><b>🔴</b>五顆紅燈熄滅才按住【油門】，搶跑罰 1 秒</div>
+        <div id="tipShift"><b>🟢</b>指針進綠區按【換檔】，超出綠區會掉速</div>
+        <div id="tipCurve"><b>⚠️</b>彎道出現時放開油門，硬踩會打滑</div>
+        <div id="tipNitro"><b>🔥</b>全隊 Perfect 集滿氮氣，全隊加速</div>
+      </div>
+      <button class="btn cyan" id="pracBtn">🎮 試玩練習</button>
+      <div class="wait">等待發車<span class="dots"></span></div>
+      <div class="count" id="lobCount"></div>
+    </div>
+  </section>
+
+  <!-- 比賽／試玩 -->
+  <section class="screen" id="sRace">
+    <div class="hud" id="hud">
+      <div class="hudTop">
+        <div class="teamBadge" id="hTeam"><i></i><span></span></div>
+        <span class="pracTag">試玩模式</span>
+        <div class="lap">LAP <b id="hLap">1</b>/<span id="hLaps">3</span></div>
+        <div class="rank" id="hRank"><b id="hRk">-</b><small id="hTot"></small></div>
+        <button class="exitP" id="exitP">結束試玩</button>
+      </div>
+      <div class="nitro" id="hNitro">車隊氮氣<div class="bar"><i id="hNbar"></i></div><span id="hNpct">0%</span></div>
+    </div>
+    <div class="roadWrap">
+      <canvas id="road"></canvas>
+      <div class="ov warn" id="warn"><span id="warnTxt"></span></div>
+      <div class="ov lights" id="lights"><div class="box"><i></i><i></i><i></i><i></i><i></i></div><p id="lightTxt">紅燈全熄就踩油門！</p></div>
+      <div class="ov goBig" id="goBig">GO!</div>
+      <div class="ov toast" id="toast"></div>
+      <div class="ov zb" id="zb"></div>
+      <div class="ov coach" id="coach"></div>
+      <div class="flash" id="flash"></div>
+    </div>
+    <div class="tachoWrap"><canvas id="tacho"></canvas></div>
+    <div class="ctrl" id="ctrl">
+      <button class="pad" id="bShift"><span class="big">▲ 換檔</span><span class="sm">SHIFT</span></button>
+      <button class="pad" id="bGas"><span class="big">按住油門</span><span class="sm">HOLD THROTTLE</span></button>
+    </div>
+    <div class="fin" id="fin">
+      <div class="flag"></div><h2 id="finH">FINISH!</h2><p id="finP"></p>
+      <div class="btns" id="finBtns"></div>
+    </div>
+  </section>
+
+  <!-- 結算 -->
+  <section class="screen" id="sDone">
+    <canvas class="bg" id="bg3"></canvas>
+    <div class="res">
+      <div class="en">RACE RESULT</div>
+      <div class="rk" id="rRank">-</div>
+      <div class="of" id="rOf">名次計算中<span class="dots"></span></div>
+      <div><div class="tr" id="rTeam" hidden></div></div>
+      <div class="msg">請看大螢幕頒獎！</div>
+    </div>
+  </section>
+</div>
+
+<script src="core.js"></script>
+<script>
+(async function () {
+  const $ = id => document.getElementById(id);
+  const SLOT = new URLSearchParams(location.search).get('slot') || '';
+  const LS = {
+    get: k => { try { return localStorage.getItem(k + SLOT); } catch (e) { return null; } },
+    set: (k, v) => { try { localStorage.setItem(k + SLOT, v); } catch (e) { } }
+  };
+  const db = await GS.ready();
+  const P = s => GS.ROOT + '/' + s;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const vib = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) { } };
+
+  let pid = LS.get('fs_pid'); if (!pid) { pid = GS.uid(); LS.set('fs_pid', pid); }
+  const me = { n: LS.get('fs_name') || '', tb: LS.get('fs_tb') || '', tm: LS.get('fs_tm') === null ? -1 : +LS.get('fs_tm'), emp: LS.get('fs_emp') || '' };
+  let game = {}, cfg = GS.cfgOf(null), round = 0, fin = null, tr = GS.track(cfg);
+  let car = null, mode = '', practicing = false, raceInit = 0, ended = false, finishing = false, myF = 0;
+  let myRank = 0, total = 0, joinedRound = 0, tstat = null, teamRes = null;
+  const unsub = {};
+  function resub(k, fn) { if (unsub[k]) unsub[k](); unsub[k] = fn ? fn() : null; }
+
+  /* ───── 畫面切換 ───── */
+  let cur = '';
+  function show(id) {
+    if (cur === id) return; cur = id;
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+    requestAnimationFrame(resize);
+  }
+
+  /* ───── 登入表單 ───── */
+  function fillJoin() {
+    const emp = cfg.loginMode === 'emp';
+    $('fName').hidden = emp; $('fEmp').hidden = !emp;
+    $('fTable').hidden = emp || cfg.teamMode !== 'table';
+    $('fTeam').hidden = emp || cfg.teamMode !== 'choose';
+    const tl = GS.tableList(cfg), curTb = $('tbIn').value || me.tb;
+    $('tbIn').innerHTML = '<option value="">請選擇桌號</option>' + tl.map(t => `<option value="${esc(t)}">${esc(t)}${/^\d+$/.test(t) ? ' 桌' : ''}</option>`).join('');
+    if (tl.includes(curTb)) $('tbIn').value = curTb;
+    const curTm = $('tmIn').value;
+    $('tmIn').innerHTML = '<option value="">請選擇車隊</option>' + cfg.teams.map((t, i) => `<option value="${i}">${esc(t.n)}</option>`).join('');
+    if (curTm !== '') $('tmIn').value = curTm;
+    $('nameIn').value = $('nameIn').value || me.n; $('empIn').value = $('empIn').value || me.emp;
+  }
+  async function doJoin() {
+    $('joinErr').textContent = '';
+    if (cfg.loginMode === 'emp') {
+      const k = GS.cleanKey($('empIn').value);
+      if (!k) { $('joinErr').textContent = '請輸入員工編號'; return; }
+      $('joinBtn').disabled = true;
+      let r = null; try { r = await db.get(P('roster/' + k)); } catch (e) { console.error(e); }
+      $('joinBtn').disabled = false;
+      if (!r) { $('joinErr').textContent = '查無此員工編號，請洽工作人員'; return; }
+      me.emp = k; me.n = GS.cleanName(r.n || k); me.tb = String(r.tb || '');
+      me.tm = cfg.teamMode === 'list' && r.tm != null ? +r.tm : (cfg.teamMode === 'table' && me.tb ? GS.teamOfTable(cfg, me.tb) : -1);
+    } else {
+      const n = GS.cleanName($('nameIn').value);
+      if (!n) { $('joinErr').textContent = '請輸入名字'; return; }
+      if (cfg.teamMode === 'table' && !$('tbIn').value) { $('joinErr').textContent = '請選擇桌號'; return; }
+      if (cfg.teamMode === 'choose' && $('tmIn').value === '') { $('joinErr').textContent = '請選擇車隊'; return; }
+      me.n = n; me.tb = cfg.teamMode === 'table' ? $('tbIn').value : '';
+      me.tm = cfg.teamMode === 'table' ? GS.teamOfTable(cfg, me.tb) : cfg.teamMode === 'choose' ? +$('tmIn').value : -1;
+      if (cfg.teamMode === 'choose' && cfg.teamCap > 0) {
+        const tc = await db.get(P('tcount/' + round + '/' + me.tm)) || 0;
+        if (tc >= cfg.teamCap) { $('joinErr').textContent = '這支車隊已經滿了，請換一隊'; return; }
+      }
+    }
+    $('nameIn').blur(); $('empIn').blur();
+    saveMe(); await ensureJoined(true); route();
+  }
+  function saveMe() { LS.set('fs_name', me.n); LS.set('fs_tb', me.tb); LS.set('fs_tm', me.tm); LS.set('fs_emp', me.emp); }
+  $('joinBtn').addEventListener('click', doJoin);
+  $('nameIn').addEventListener('keydown', e => { if (e.key === 'Enter') doJoin(); });
+  $('empIn').addEventListener('keydown', e => { if (e.key === 'Enter') doJoin(); });
+
+  /* ───── 資料庫監聽 ───── */
+  db.onConnected(ok => $('conn').classList.toggle('on', !ok));
+  db.on(P('game'), g => {
+    const oldCfg = JSON.stringify(cfg);
+    game = g || {}; cfg = GS.cfgOf(game);
+    if (JSON.stringify(cfg) !== oldCfg) { tr = GS.track(cfg); fillJoin(); applyCfgUI(); }
+    const r = game.round || 1;
+    if (r !== round) { round = r; newRound(); }
+    route();
+  });
+
+  function applyCfgUI() {
+    $('ctrl').classList.toggle('noshift', !cfg.mech.shift);
+    $('tipShift').hidden = !cfg.mech.shift; $('tipCurve').hidden = !cfg.mech.curve; $('tipNitro').hidden = !cfg.mech.nitro;
+    $('pracBtn').hidden = !cfg.practice;
+    $('hNitro').classList.toggle('off', !cfg.mech.nitro);
+    paintTeam();
+  }
+  function paintTeam() {
+    const t = me.tm >= 0 ? GS.team(cfg, me.tm) : { n: '分配車隊中', c: '#888' };
+    document.documentElement.style.setProperty('--tm', t.c);
+    [$('lobTeam'), $('hTeam')].forEach(el => el.querySelector('span').textContent = t.n);
+    $('lobName').textContent = me.n;
+  }
+
+  async function newRound() {
+    ended = false; finishing = false; raceInit = 0; myF = 0; myRank = 0; total = 0; tstat = null; teamRes = null;
+    car = null; stopPractice(true); hideFin(); lastKey = '';
+    const r = round;
+    resub('fin', () => db.on(P('finish/' + r), v => { fin = v; }));
+    resub('rank', () => db.on(P('results/' + r + '/ranks/' + pid), v => { myRank = v || 0; renderDone(); }));
+    resub('total', () => db.on(P('results/' + r + '/total'), v => { total = v || 0; renderDone(); }));
+    resub('teams', () => db.on(P('results/' + r + '/teams'), v => { teamRes = v ? GS.toArr(v) : null; renderDone(); }));
+    resub('count', () => db.on(P('counts/' + r), v => { $('lobCount').innerHTML = v ? `已有 <b>${v}</b> 位車手進場` : ''; liveTotal = v || 0; }));
+    resub('lr', () => db.on(P('lrank/' + r + '/' + pid), v => { liveRank = v || 0; }));
+    resub('ts', null);
+    restored = null;
+    if (+LS.get('fs_round') === r) {
+      try { const p = await db.get(P('players/' + pid)); if (p && r === round) restored = p; } catch (e) { console.error(e); }
+    } else LS.set('fs_round', r);
+    if (me.n) await ensureJoined(false);
+    route();
+  }
+  let restored = null, liveRank = 0, liveTotal = 0;
+
+  /* 進場：每局一次計數；自動分隊在這裡決定 */
+  let joining = false;
+  async function ensureJoined(force) {
+    if (!me.n || joining || !round) return;
+    if (+LS.get('fs_joined') === round && me.tm >= 0) { watchTeam(); send(true); return; }
+    joining = true;
+    try {
+      if (cfg.teamMode === 'table' && me.tb) me.tm = GS.teamOfTable(cfg, me.tb);
+      if (me.tm < 0 || me.tm >= cfg.teams.length) {
+        const tc = await db.get(P('tcount/' + round)) || {};
+        let best = 0, bv = Infinity;
+        cfg.teams.forEach((t, i) => { const v = +tc[i] || 0; if (v < bv) { bv = v; best = i; } });
+        me.tm = best;
+      }
+      saveMe(); paintTeam();
+      await db.txn(P('counts/' + round), c => (c || 0) + 1);
+      await db.txn(P('tcount/' + round + '/' + me.tm), c => (c || 0) + 1);
+      LS.set('fs_joined', round);
+      watchTeam();
+      await send(true);
+    } catch (e) { console.error(e); }
+    joining = false;
+  }
+  function watchTeam() {
+    paintTeam();
+    resub('ts', () => db.on(P('tstat/' + round + '/' + me.tm), v => { tstat = v; renderNitro(); }));
+  }
+
+  /* ───── 寫入進度（每 1.5 秒，有變化才寫） ───── */
+  let lastKey = '', sending = false, ev = '', ec = 0;
+  async function send(force) {
+    if (!me.n || !round || me.tm < 0) return;
+    const d = car && mode === 'race' ? Math.floor(car.d) : (restored ? restored.d || 0 : 0);
+    const pl = {
+      n: me.n, tb: me.tb, tm: me.tm, d, v: car && mode === 'race' ? Math.round(car.v * 10) : 0,
+      s: GS.score(d, myF), f: myF || 0, pc: car && mode === 'race' ? car.pc : (restored ? restored.pc || 0 : 0), e: ev, ec, t: Math.round(db.now())
+    };
+    const key = [pl.d, pl.f, pl.ec, pl.tm, pl.n, pl.v > 0].join('|');
+    if (!force && key === lastKey) return;
+    if (sending && !force) return;
+    sending = true;
+    try { await db.set(P('players/' + pid), pl); lastKey = key; }
+    catch (e) { console.error(e); }
+    finally { sending = false; }
+  }
+  setInterval(() => { if (game.status === 'racing' && mode === 'race' && !ended) send(false); }, 1500);
+
+  /* ───── 流程判斷 ───── */
+  function route() {
+    if (!me.n || me.tm < 0) { if (practicing) stopPractice(true); show('sJoin'); return; }
+    const s = game.status || 'lobby';
+    if (s === 'lobby') {
+      if (practicing) { show('sRace'); return; }
+      show('sLobby'); return;
+    }
+    if (practicing) stopPractice(true);
+    if (s === 'grid' || s === 'racing') {
+      if (ended) { show('sDone'); return; }
+      startRace(); show('sRace'); return;
+    }
+    if (s === 'ended') { if (!ended) endRace(); show('sDone'); }
+  }
+
+  /* ───── 正式比賽 ───── */
+  function startRace() {
+    if (raceInit === round) return; raceInit = round;
+    mode = 'race'; ended = false;
+    car = new GS.Car(tr, cfg.mech, onEv); holding = false; $('bGas').classList.remove('hold');
+    if (restored) { car.restore(restored.d || 0, restored.pc || 0); myF = restored.f || 0; if (myF) { car.done = true; finishing = true; } }
+    car.wasStarted = !!(restored && restored.d > 0);
+    setupRaceUI(false);
+    if (myF) showFin(`你是第 <b style="color:#ffd60a;font-size:22px">${myF}</b> 位衝線的車手<br>等待其他車手<span class="dots"></span>`);
+  }
+  function endRace() {
+    if (ended) return; ended = true;
+    if (car) car.done = true;
+    send(true); renderDone(); show('sDone');
+  }
+  async function finishRace() {
+    if (finishing) return; finishing = true;
+    vib([60, 40, 60, 40, 200]);
+    showFin('確認名次<span class="dots"></span>');
+    try {
+      const r = await db.txn(P('finish/' + round), c => { c = c || {}; c.count = (c.count || 0) + 1; if (!c.firstAt) c.firstAt = Math.round(db.now()); return c; });
+      if (r.committed && r.val) myF = r.val.count;
+    } catch (e) { console.error(e); }
+    await send(true);
+    showFin(`你是第 <b style="color:#ffd60a;font-size:22px">${myF}</b> 位衝線的車手<br>等待其他車手<span class="dots"></span>`);
+  }
+  function showFin(html, btns) {
+    $('finH').textContent = 'FINISH!'; $('finP').innerHTML = html; $('finBtns').innerHTML = '';
+    (btns || []).forEach(b => { const e = document.createElement('button'); e.className = 'btn ' + (b.cls || ''); e.textContent = b.t; e.onclick = b.fn; $('finBtns').appendChild(e); });
+    $('fin').classList.add('on');
+  }
+  function hideFin() { $('fin').classList.remove('on'); }
+
+  function renderDone() {
+    if (cur !== 'sDone' && !ended) return;
+    $('rRank').textContent = myRank ? '#' + myRank : (myF ? '#' + myF : '-');
+    $('rOf').innerHTML = myRank ? `全場 ${total} 位車手` : '名次計算中<span class="dots"></span>';
+    if (teamRes && teamRes.length) {
+      const k = teamRes.findIndex(x => +x.i === +me.tm);
+      if (k >= 0) {
+        const t = GS.team(cfg, me.tm);
+        $('rTeam').hidden = false;
+        $('rTeam').innerHTML = `${esc(t.n)}　車隊第 <b>${k + 1}</b> 名`;
+      }
+    } else $('rTeam').hidden = true;
+  }
+
+  /* ───── 試玩 ───── */
+  let pStep = 0, pPerf = 0, pNitroUntil = 0, pStartT = 0;
+  $('pracBtn').onclick = () => {
+    if (!cfg.practice || (game.status || 'lobby') !== 'lobby') return;
+    startPractice();
+  };
+  $('exitP').onclick = () => { stopPractice(); route(); };
+  function startPractice() {
+    practicing = true; mode = 'prac'; hideFin();
+    const ptr = GS.practiceTrack(cfg);
+    car = new GS.Car(ptr, cfg.mech, onEv); car.prac = true; holding = false; $('bGas').classList.remove('hold');
+    pStep = 0; pPerf = 0; pNitroUntil = 0;
+    const now = db.now();
+    car.nL = GS.LIGHTS; car.lightMs = 500; car.lightsAt = now + 800; car.startAt = car.lightsAt + car.nL * car.lightMs + 300 + Math.random() * 500;
+    setupRaceUI(true);
+    coach('紅燈<b>全部熄滅</b>後，<b>按住</b>右邊油門！太早按會搶跑');
+    show('sRace');
+  }
+  function stopPractice(silent) {
+    if (!practicing) return;
+    practicing = false; mode = ''; car = null; hideFin(); coach('');
+    $('hud').classList.remove('prac');
+  }
+  function coach(t) { $('coach').innerHTML = t; $('coach').classList.toggle('on', !!t); }
+  function practiceTick(now) {
+    if (!car || !car.go) return;
+    if (pStep === 0 && car.rpm > 0.35) { pStep = 1; coach(cfg.mech.shift ? '指針進入<b>綠區</b>時，按左邊<b>換檔</b>！檔位越高指針越快' : '按住<b>油門</b>，車子會自動換檔'); }
+    else if (pStep === 1 && (car.g >= 3 || !cfg.mech.shift && car.g >= 2)) { pStep = 2; coach(cfg.mech.shift ? '超出綠區會<b>掉速</b>，紅區太久會<b>熄火</b>。5 檔要<b>一按一放</b>把指針留在綠區！' : '很好！繼續加速'); }
+    else if (pStep === 2 && car.warn) { pStep = 3; coach('⚠️ 彎道來了！<b>放開油門</b>滑過去，別踩！'); }
+    else if (pStep === 3 && !car.inCurve && car.ci >= 1) { pStep = 4; coach(cfg.mech.nitro ? '過彎後會降回 2 檔。Perfect 換檔會幫車隊<b>集氮氣</b>！' : '過彎後會降回 2 檔，重新換檔加速！'); }
+    if (cfg.mech.nitro && car.pc >= (pPerf + 3)) { pPerf = car.pc; pNitroUntil = now + cfg.nitroSec * 1000; car.nitroUntil = pNitroUntil; toast('🔥 氮氣加速！', 'blue'); vib([40, 30, 40, 30, 120]); flash('blue'); }
+  }
+
+  /* ───── 事件回饋 ───── */
+  function onEv(k, x) {
+    const sev = c => { if (mode === 'race') { ev = c; ec++; } };
+    if (k === 'perfect') { toast('PERFECT 換檔！', 'good'); vib(30); sev('pf'); }
+    if (k === 'early') { toast('太早換檔', 'bad'); vib(60); }
+    if (k === 'late') { toast('太晚換檔', 'bad'); vib(60); }
+    if (k === 'top') toast('已經是最高檔', 'gold');
+    if (k === 'stall') { toast('💥 熄火了！', 'bad'); vib([100, 50, 200]); flash('red'); sev('st'); }
+    if (k === 'slip') { toast('打滑！', 'bad'); vib([80, 40, 80]); flash('red'); sev('sl'); }
+    if (k === 'corner') { toast('完美過彎', 'good'); sev('cr'); }
+    if (k === 'curveIn') vib(40);
+    if (k === 'curveWarn') vib([30, 40, 30]);
+    if (k === 'jump') { toast('搶跑！罰 1 秒', 'bad'); vib(300); flash('red'); sev('jp'); }
+    if (k === 'launch') { toast('完美起步！', 'gold'); sev('lc'); }
+    if (k === 'finish') {
+      if (car && car.prac) {
+        const sec = ((db.now() - car.startAt) / 1000).toFixed(1);
+        coach('');
+        showFin(`試玩完成，用時 <b style="color:#ffd60a">${sec}</b> 秒<br>正式比賽是 3 圈，彎道會越來越多`, [
+          { t: '再練一次', cls: 'cyan', fn: () => startPractice() },
+          { t: '結束試玩', cls: 'ghost', fn: () => { stopPractice(); route(); } }
+        ]);
+      } else finishRace();
+    }
+  }
+  let toastT = 0;
+  function toast(msg, cls) {
+    const t = $('toast'); t.textContent = msg; t.className = 'ov toast on ' + (cls || '');
+    clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 900);
+  }
+  function flash(c) { const f = $('flash'); f.className = 'flash ' + c; setTimeout(() => f.className = 'flash', 140); }
+
+  /* ───── 按鈕 ───── */
+  function hit(el) { el.classList.add('hit'); setTimeout(() => el.classList.remove('hit'), 70); }
+  /* 油門：按住加速，放開減速 */
+  let holding = false;
+  function gas(on) {
+    if (!car || car.done) { holding = false; $('bGas').classList.remove('hold'); return; }
+    const now = db.now();
+    if (on && !car.go) {
+      const la = car.prac ? car.lightsAt : (game.lightsAt || 0);
+      if (!la || now < la) { toast('等待發車…', ''); return; }
+    }
+    holding = !!on;
+    $('bGas').classList.toggle('hold', holding);
+    car.setHold(holding, now);
+  }
+  function shift() { if (!car || !car.go || car.done) return; hit($('bShift')); car.shift(db.now()); }
+  const bGas = $('bGas');
+  bGas.addEventListener('pointerdown', e => { e.preventDefault(); try { bGas.setPointerCapture(e.pointerId); } catch (x) { } gas(true); }, { passive: false });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(k => bGas.addEventListener(k, () => gas(false)));
+  bGas.addEventListener('contextmenu', e => e.preventDefault());
+  $('bShift').addEventListener('pointerdown', e => { e.preventDefault(); shift(); }, { passive: false });
+  ['bGas', 'bShift'].forEach(id => $(id).addEventListener('touchstart', e => e.preventDefault(), { passive: false }));
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  window.addEventListener('blur', () => gas(false));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) gas(false); });
+  document.addEventListener('keydown', e => {
+    if (cur !== 'sRace' || e.repeat) return;
+    if (e.key === 'j' || e.key === 'ArrowUp' || e.key === ' ') { e.preventDefault(); gas(true); }
+    if (e.key === 'f' || e.key === 'Shift') { e.preventDefault(); shift(); }
+  });
+  document.addEventListener('keyup', e => { if (e.key === 'j' || e.key === 'ArrowUp' || e.key === ' ') gas(false); });
+
+
+  /* ───── 比賽 UI ───── */
+  function setupRaceUI(prac) {
+    $('hud').classList.toggle('prac', prac);
+    $('hLaps').textContent = car.tr.laps;
+    $('lights').classList.remove('on'); $('goBig').classList.remove('on');
+    $('warn').classList.remove('on');
+    coach(''); bgOff = 0; lastLap = -1;
+    applyCfgUI();
+  }
+  function renderNitro() {
+    if (!cfg.mech.nitro) return;
+    let g = 0, full = false;
+    const now = db.now();
+    if (practicing && car) { g = Math.min(1, (car.pc - pPerf) / 3); full = now < pNitroUntil; }
+    else if (tstat) { g = Math.min(1, +tstat.g || 0); full = now < (tstat.nu || 0); }
+    $('hNbar').style.width = (full ? 100 : g * 100) + '%';
+    $('hNpct').textContent = full ? '加速中！' : Math.round(g * 100) + '%';
+    $('hNitro').classList.toggle('full', full);
+  }
+
+  /* ───── 畫布 ───── */
+  const road = $('road'), rctx = road.getContext('2d'), tach = $('tacho'), tctx = tach.getContext('2d');
+  const bgs = ['bg1', 'bg2', 'bg3'].map(id => $(id));
+  let DPR = Math.min(2, window.devicePixelRatio || 1);
+  function fit(c) { const r = c.getBoundingClientRect(); const w = Math.max(1, Math.round(r.width * DPR)), h = Math.max(1, Math.round(r.height * DPR)); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; } }
+  function resize() { DPR = Math.min(2, window.devicePixelRatio || 1); fit(road); fit(tach); bgs.forEach(fit); }
+  window.addEventListener('resize', resize);
+
+  let lastT = performance.now(), bgOff = 0, lastLap = -1, lightPhase = -1, tIdle = 0, nitroWas = false;
+  function frame(tn) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.05, (tn - lastT) / 1000); lastT = tn;
+    const t = tn / 1000, now = db.now();
+    if (cur === 'sRace' && car) {
+      // 燈號
+      const la = car.prac ? car.lightsAt : game.lightsAt, sa = car.prac ? car.startAt : game.startAt;
+      const nL = car.prac ? car.nL : GS.LIGHTS, lm = car.prac ? car.lightMs : GS.LIGHT_MS;
+      if (!car.go) {
+        if (sa && now >= sa && (car.prac || game.status === 'racing')) {
+          car.start(sa); $('lights').classList.remove('on');
+          if (!car.wasStarted) { $('goBig').classList.remove('on'); void $('goBig').offsetWidth; $('goBig').classList.add('on'); vib(120); }
+        } else {
+          $('lights').classList.add('on');
+          const lit = la && now >= la ? Math.min(nL, Math.floor((now - la) / lm) + 1) : 0;
+          [...$('lights').querySelectorAll('i')].forEach((el, i) => { el.style.display = i < nL ? '' : 'none'; el.classList.toggle('on', i < lit); });
+          $('lightTxt').textContent = !la || now < la ? (game.status === 'grid' && !car.prac ? '車手就位，等待發車…' : '準備…') : '紅燈全熄就踩油門！';
+        }
+      }
+      if (!car.prac && game.status === 'racing' && !car.wasStarted && car.go && now - (game.startAt || 0) > 5000) car.wasStarted = true;
+      if (car.go && !car.done) {
+        if (!car.prac && cfg.mech.nitro && tstat) car.nitroUntil = tstat.nu || 0;
+        car.step(dt, now);
+        if (car.prac) practiceTick(now);
+      }
+      if (!car.prac && game.status === 'racing' && !ended && now >= GS.endAt(game, fin)) endRace();
+      // 氮氣開始的瞬間
+      const nOn = now < car.nitroUntil;
+      if (nOn && !nitroWas && !car.prac) { toast('🔥 車隊氮氣！', 'blue'); vib([40, 30, 40, 30, 150]); flash('blue'); if (mode === 'race') { ev = 'nt'; ec++; } }
+      nitroWas = nOn;
+      // HUD
+      const lap = car.lap();
+      $('hLap').textContent = lap + 1;
+      if (lap !== lastLap) { if (lastLap >= 0 && !car.prac) toast(lap === car.tr.laps - 1 ? '🏁 最後一圈！' : `LAP ${lap + 1}`, 'gold'); lastLap = lap; }
+      if (!car.prac) { $('hRk').textContent = liveRank ? '#' + liveRank : '-'; $('hTot').textContent = liveTotal ? ' / ' + liveTotal : ''; }
+      renderNitro();
+      const w = car.warn;
+      if (w && cfg.mech.curve) {
+        $('warn').classList.add('on'); $('warn').classList.toggle('act', w.active);
+        $('warnTxt').textContent = w.active ? (car.slipped ? '打滑中…' : '過彎中・別踩油門！') : `⚠ ${w.dir > 0 ? '右' : '左'}彎　放開油門`;
+      } else $('warn').classList.remove('on');
+      const locked = car.locked(now) || !car.go;
+      $('bGas').classList.toggle('dis', car.go && locked);
+      $('bShift').classList.toggle('dis', !car.go || locked || car.g >= 5);
+      const [lo, hi] = car.zone(), inZone = car.go && car.rpm >= lo && car.rpm <= hi && car.g < 5;
+      $('bShift').classList.toggle('zone', inZone && cfg.mech.shift);
+      // 繪圖
+      bgOff += GS.curveAt(car.tr, car.d) * car.v * dt * 3;
+      const W = road.width, H = road.height;
+      GS.drawRoad(rctx, W, H, {
+        tr: car.tr, camD: car.d - 6.5, camX: 0, camH: 2.4, horizon: 0.36, fov: 96, drawN: 120, t, bgOff, labels: false,
+        brand: cfg.brand, logoImg, speedFx: Math.min(1, car.v / 70),
+        cars: [{ d: car.d, x: 0, color: GS.team(cfg, me.tm).c, nitro: nOn, boost: now < car.boostUntil, smoke: now < car.slipUntil || now < car.stallUntil, v: car.v }]
+      });
+      GS.drawTacho(tctx, tach.width, tach.height, { rpm: car.rpm, gear: car.g, v: car.v, zone: cfg.mech.shift ? [lo, hi] : null, inZone: inZone && cfg.mech.shift, flash: Math.floor(t * 12) % 2, stall: now < car.stallUntil });
+      const zb = $('zb'), zOn = car.go && !car.done && (car.over || car.out5);
+      zb.classList.toggle('on', zOn); zb.classList.toggle('y', zOn && !car.over);
+      if (zOn) zb.innerHTML = car.over ? '<span>⚠ 過轉・掉速！</span>' : '<span>出綠區・速度變慢</span>';
+    } else if (cur === 'sJoin' || cur === 'sLobby' || cur === 'sDone') {
+      tIdle += dt * 30;
+      const c = $(cur === 'sJoin' ? 'bg1' : cur === 'sLobby' ? 'bg2' : 'bg3');
+      bgOff += GS.curveAt(tr, tIdle % tr.total) * 30 * dt * 3;
+      GS.drawRoad(c.getContext('2d'), c.width, c.height, {
+        tr, camD: tIdle % tr.total, camH: 2.6, horizon: 0.5, fov: 96, drawN: 110, t, bgOff, labels: false, brand: cfg.brand, logoImg, speedFx: 0.35,
+        cars: me.tm >= 0 && cur !== 'sJoin' ? [{ d: tIdle % tr.total + 7, x: 0, color: GS.team(cfg, me.tm).c, v: 30 }] : []
+      });
+    }
+  }
+  let logoImg = null, logoSrc = '';
+  setInterval(() => { if (cfg.logo !== logoSrc) { logoSrc = cfg.logo; logoImg = null; if (logoSrc) { const im = new Image(); im.src = logoSrc; logoImg = im; } } }, 1000);
+
+  fillJoin(); applyCfgUI(); resize();
+  requestAnimationFrame(frame);
+  route();
+})();
+</script>
+</body>
+</html>
