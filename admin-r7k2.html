@@ -175,6 +175,16 @@ td.r,th.r{text-align:right}
       <div class="hint">測試車名字前綴「測試_」，由這個後台分頁模擬駕駛（隨機分到各隊）。開新一局會一併清掉。<br>正式活動前記得開新一局清空。</div>
     </section>
 
+    <section class="card" style="border-color:#5a1020">
+      <h2 style="color:#ff2d55">全部重置（測試完、正式活動前用）</h2>
+      <div class="chk" style="grid-template-columns:1fr">
+        <label><input type="checkbox" id="rsNames" checked> 同時清掉玩家手機上的名字（大家要重新登入）</label>
+        <label><input type="checkbox" id="rsRoster"> 同時清掉匯入的員工名單</label>
+      </div>
+      <button id="bReset" style="margin-top:10px;width:100%">🗑 全部重置</button>
+      <div class="hint">會清空：所有玩家、成績、車隊統計、測試車，局數從第 1 局重新算。<br>會保留：賽事設定、車隊設定（名單看上面勾選）。<br>「開新一局」只清本局成績、手機上的名字會保留，適合同一場活動玩第二輪。</div>
+    </section>
+
     <section class="card links">
       <h2>頁面連結</h2>
       <a id="lPlayer" target="_blank"></a>
@@ -264,7 +274,7 @@ td.r,th.r{text-align:right}
     const LABEL = { lobby: '等待中（可試玩）', grid: '發車區待命', countdown: '紅燈倒數中', racing: '比賽中', grace: '最後倒數', closing: '計算名次中', ended: '已結束' };
     function render() {
       const now = db.now(), ph = phaseOf(now);
-      $('sRound').textContent = round;
+      $('sRound').textContent = round - (game && game.base || 0);
       const show = game && game.show;
       $('sStatus').textContent = (LABEL[ph] || '-') + (show === 'podium' ? '（頒獎台）' : show === 'teams' ? '（車隊排名）' : '');
       $('sJoined').textContent = joined;
@@ -279,7 +289,7 @@ td.r,th.r{text-align:right}
       $('bTeams').textContent = show === 'teams' ? '🚩 收起車隊排名' : '🚩 公布車隊排名';
       const lock = !(ph === 'lobby');
       document.querySelectorAll('main input, main select, main textarea, #bSave, #addTeam, #bRoster, .teamRow button').forEach(el => {
-        if (el.id === 'botN') return; el.disabled = lock;
+        if (el.id === 'botN' || el.id === 'rsNames' || el.id === 'rsRoster') return; el.disabled = lock;
       });
       $('saveHint').textContent = lock ? '比賽進行中，設定已鎖定' : (formDirty ? '⚠ 有尚未儲存的修改' : '設定只在「等待中」可以修改');
     }
@@ -389,6 +399,23 @@ td.r,th.r{text-align:right}
         players: null, finish: null, counts: null, tcount: null, tstat: null, lrank: null, results: null,
         'game/round': round + 1, 'game/status': 'lobby', 'game/startAt': null, 'game/lightsAt': null, 'game/forceEndAt': null, 'game/show': ''
       }));
+    };
+
+    $('bReset').onclick = async () => {
+      const ph = phaseOf(db.now());
+      if (ph !== 'lobby' && ph !== 'ended' && ph !== 'grid') { alert('比賽進行中，請先強制結束再重置'); return; }
+      if (!confirm('確定要全部重置？所有玩家和成績都會清空，無法復原')) return;
+      if (!confirm('再確認一次：真的要清空嗎？')) return;
+      stopBots();
+      const up = {
+        players: null, finish: null, counts: null, tcount: null, tstat: null, lrank: null, results: null,
+        'game/round': round + 1, 'game/base': round, 'game/status': 'lobby', 'game/startAt': null, 'game/lightsAt': null, 'game/forceEndAt': null, 'game/show': ''
+      };
+      if ($('rsNames').checked) up['game/reset'] = Date.now().toString(36);
+      if ($('rsRoster').checked) { up.roster = null; up.rosterN = null; }
+      await aw(() => db.update(GS.ROOT, up));
+      if ($('rsRoster').checked) refreshRosterCount();
+      alert('✅ 已全部重置');
     };
 
     /* ───── 每 2 秒：車隊平均、氮氣、即時名次 ───── */

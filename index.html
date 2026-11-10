@@ -327,6 +327,15 @@ input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(25,2
     const oldCfg = JSON.stringify(cfg);
     game = g || {}; cfg = GS.cfgOf(game);
     if (JSON.stringify(cfg) !== oldCfg) { tr = GS.track(cfg); fillJoin(); applyCfgUI(); }
+    // 後台「全部重置」：清掉手機上的名字，要求重新登入
+    const rs = String(game.reset || '');
+    if (rs && LS.get('fs_reset') !== rs) {
+      if (me.n) {
+        Object.assign(me, { n: '', tb: '', tm: -1, emp: '' }); saveMe(); LS.set('fs_joined', ''); LS.set('fs_round', '');
+        stopPractice(true); car = null; hideFin(); $('nameIn').value = ''; $('empIn').value = ''; $('tbIn').value = ''; $('tmIn').value = '';
+      }
+      LS.set('fs_reset', rs);
+    }
     const r = game.round || 1;
     if (r !== round) { round = r; newRound(); }
     route();
